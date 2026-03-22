@@ -1,0 +1,202 @@
+{
+  "session_id": "user3",
+  "message": "I prefer quiet temples"
+}
+{
+  "session_id": "user3",
+  "message": "avoid crowded temples"
+}
+
+{
+  "session_id": "user3",
+  "message": "I like sunrise temple visits"
+}
+
+{
+  "session_id": "user3",
+  "message": "plan a peaceful temple trip"
+}
+
+
+
+TEST PLAN (Use these exact inputs)
+🟢 1. Basic Streaming Test
+
+👉 Type:
+
+Tell me about Nashik
+✅ Expected:
+
+Text appears word by word
+
+No cards
+
+No map
+
+🟢 2. Temple Flow (MAIN TEST 🔥)
+
+👉 Type:
+
+Best temples in Nashik
+✅ Expected:
+
+🧠 Text stream starts
+
+🛕 Temple cards appear
+
+🗺 Map appears
+
+📍 Markers visible
+
+🟢 3. Button Test (IMPORTANT)
+
+👉 Click:
+
+📍 Open in Maps
+✅ Expected:
+
+Opens Google Maps in new tab
+
+Correct location
+
+🟢 4. Marker Click Test
+
+👉 Click any marker on map
+
+✅ Expected:
+
+Google Maps opens
+
+🟢 5. Multi-event Order Test
+
+👉 Type:
+
+Suggest temples in Nashik with tips
+✅ Expected order:
+
+message → streaming
+
+temples → cards
+
+map → map
+
+tips → blue box
+
+🟢 6. Edge Case Test
+
+👉 Type:
+
+asdasdasd
+✅ Expected:
+
+Only text response
+
+No crash
+
+🟢 7. Empty Input Test
+
+👉 Press enter without typing
+
+✅ Expected:
+
+Nothing happens
+
+🟢 8. Rapid Requests Test
+
+👉 Send 2 messages quickly:
+
+Temples in Nashik
+Temples in Pune
+✅ Expected:
+
+No crash
+
+Second request waits (loading state works)
+
+🚨 If Something Breaks → Debug Checklist
+❌ Map not showing?
+
+Check .env
+
+Restart React
+
+Console error:
+
+Google Maps JavaScript API error
+❌ No streaming?
+
+Check Network tab → /chat-stream
+
+Should see event-stream
+
+❌ No cards?
+
+Backend not sending:
+
+type: "temples"
+❌ Map but no markers?
+
+Missing lat/lng in backend
+
+🔥 Pro Testing Trick
+
+Open browser console:
+
+console.log(msg)
+
+Inside renderMessage
+
+👉 See exactly what frontend receives
+
+🧠 Golden Test (MOST IMPORTANT)
+
+👉 Type:
+
+Plan a temple visit in Nashik for 1 day
+✅ Ideal Output:
+
+Explanation (streaming)
+
+Temple cards
+
+Map
+
+Tips
+
+👉 If this works → your system is end-to-end solid
+
+
+
+
+STEP 7 — TEST CASES (VERY IMPORTANT)
+
+Try these in UI:
+
+✅ Temple
+Best quiet temples in Kochi
+✅ Food
+Best cafes in Kochi
+✅ Hotel
+Best hotels in Kochi
+✅ Generic
+Tourist places in Kochi
+
+
+Test Cases You MUST run
+
+Try these inputs:
+
+1
+Best cafes in Delhi
+2
+Suggest restaurants in Mumbai
+3 (edge case)
+Places in "New Delhi"
+
+👉 Expected:
+
+ALWAYS produces:
+
+Thought:
+Action:
+Action Input:

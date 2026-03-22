@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>AI Agent Chat</title>
+  <style>
+    body { font-family: Arial; padding: 40px; }
+    #chat { margin-bottom: 20px; }
+    .message { margin: 10px 0; }
+    .user { font-weight: bold; }
+    .bot { color: blue; }
+    .reasoning { color: gray; font-size: 0.9em; }
+  </style>
+</head>
+<body>
+
+  <h2>AI Agent Chat</h2>
+
+  <div id="chat"></div>
+
+  <input type="text" id="input" placeholder="Ask something..." />
+  <button onclick="sendMessage()">Send</button>
+
+  <script>
+    async function sendMessage() {
+      const input = document.getElementById("input");
+      const chat = document.getElementById("chat");
+
+      const userMessage = input.value;
+      input.value = "";
+
+      chat.innerHTML += `<div class="message user">You: ${userMessage}</div>`;
+
+      const response = await fetch("http://127.0.0.1:8000/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          message: userMessage,
+          session_id: "user123"
+        })
+      });
+
+      const data = await response.json();
+
+      chat.innerHTML += `
+        <div class="message bot">
+          AI: ${data.final_answer}
+          <div class="reasoning">Reasoning: ${data.reasoning}</div>
+        </div>
+      `;
+    }
+  </script>
+
+</body>
+</html>
