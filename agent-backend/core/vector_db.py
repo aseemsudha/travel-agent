@@ -4,7 +4,7 @@ from sentence_transformers import SentenceTransformer
 import uuid
 import os
 
-print("Chroma path:", os.path.abspath("./chroma"))
+
 # -----------------------------
 # Initialize embedding model
 # -----------------------------
@@ -13,9 +13,18 @@ model = SentenceTransformer("all-MiniLM-L6-v2")
 # -----------------------------
 # Initialize Chroma client
 # -----------------------------
-client = chromadb.Client(
-    Settings(
-        persist_directory=os.path.abspath("./chroma"),
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+persist_dir = os.path.join(BASE_DIR, "chroma")
+
+print("Chroma path:", persist_dir)
+print("Exists:", os.path.exists(persist_dir))
+
+print("Chroma will be stored at:", persist_dir)
+
+client = chromadb.PersistentClient(
+    path=persist_dir,
+    settings=Settings(
         anonymized_telemetry=False
     )
 )
@@ -56,7 +65,7 @@ def add_knowledge(texts, metadatas):
 # -----------------------------
 def search_knowledge(query, k=3, source_filter=None):
 
-    collection = get_collection()
+    collection = get_knowledge_collection()
 
     query_embedding = model.encode(query).tolist()
 

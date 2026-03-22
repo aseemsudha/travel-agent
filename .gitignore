@@ -9,7 +9,7 @@ venv/
 agent-backend/venv/
 
 # Vector DB / local data
-chroma/
+core/chroma/
 
 # Node
 node_modules/
