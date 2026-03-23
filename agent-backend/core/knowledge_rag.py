@@ -3,6 +3,7 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 import os
 from core.vector_db import add_knowledge, search_knowledge, get_knowledge_collection
+from app_config import KNOWLEDGE_DIR, TOP_K
 
 collection = get_knowledge_collection()
 
@@ -22,7 +23,7 @@ def load_knowledge():
     texts = []
     metadatas = []
 
-    for filename in os.listdir("knowledge"):
+    for filename in os.listdir(KNOWLEDGE_DIR):
 
         with open(f"knowledge/{filename}") as f:
 
@@ -47,7 +48,7 @@ def search_knowledge(query, source_filter=None):
 
     results = collection.query(
         query_texts=[query],
-        n_results=5
+        n_results=TOP_K
     )
 
     documents = results["documents"][0]

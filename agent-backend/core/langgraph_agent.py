@@ -28,8 +28,10 @@ from core.llm import call_llm
 from core.tool_registry import execute_tool
 from core.critic import run_critic
 
-from core.memory import get_memory, save_memory
-from core.vector_memory import search_memory
+from core.memory import get_memory
+from core.vector_db import save_memory
+from core.vector_memory import search_memory_faiss
+from core.vector_db import search_memory
 from core.knowledge_rag import search_knowledge
 from core.query_rewriter import rewrite_query
 from core.retry import fix_tool_input
@@ -42,6 +44,8 @@ from core.observability import Observability as LGObs
 from llmops.observability import Observability as LLMObs
 
 from langsmith import traceable
+
+from app_config import RECURSION_LIMIT
 
 
 # =====================================================
@@ -129,6 +133,17 @@ def agent_node(state: AgentState):
     prompt = f"""
         You are an AI travel assistant.
 
+        You MUST consider the user's previous preferences and conversation history when generating the response.
+
+        User Memory:
+        {memory}
+
+        Relevant Knowledge:
+        {knowledge}
+
+        User Query:
+        {query}
+
         You MUST return ONLY valid JSON.
 
         Do NOT write explanations.
@@ -140,8 +155,6 @@ def agent_node(state: AgentState):
         {json.dumps(json_instruction, indent=4)}
 
         If information is missing, still generate a useful plan.
-
-        User Query: {query}
     """
 
     # LLMOps observability
@@ -278,13 +291,19 @@ def critic_node(state: AgentState):
 
     # Save memory
     save_memory(
-        state["session_id"],
-        f"user: {state['query']}"
+        f"user: {state['query']}",
+        {
+            "session_id": state["session_id"],
+            "type": "conversation"
+        }
     )
 
     save_memory(
-        state["session_id"],
-        f"agent: {improved}"
+        f"agent: {improved}",
+        {
+            "session_id": state["session_id"],
+            "type": "conversation"
+        }
     )
 
     obs.log(
@@ -387,7 +406,7 @@ def run_langgraph_agent(query: str, session_id: str):
     state = graph.invoke(
         state,
         config={
-            "recursion_limit": 10,
+            "recursion_limit": RECURSION_LIMIT,
             "metadata": {
                 "session_id": session_id,
                 "query": query

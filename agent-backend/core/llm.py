@@ -9,6 +9,7 @@ import subprocess
 from llmops.observability import Observability as LLMObs
 
 from langsmith import traceable
+from app_config import LLM_MODEL
 
 
 # -------------------------------
@@ -24,8 +25,8 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID")
 GCP_LOCATION = os.getenv("GCP_LOCATION", "asia-south1")
 
-MODEL_AI_STUDIO = "gemini-2.5-flash"
-MODEL_VERTEX = "gemini-2.5-flash"
+MODEL_AI_STUDIO = LLM_MODEL
+MODEL_VERTEX = LLM_MODEL
 
 
 # -------------------------------

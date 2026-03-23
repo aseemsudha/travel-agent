@@ -18,7 +18,7 @@ def add_memory(text):
 
     memory_texts.append(text)
 
-def search_memory(query, k=3):
+def search_memory_faiss(query, k=3):
 
     if len(memory_texts) == 0:
         return []
