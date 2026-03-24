@@ -107,6 +107,8 @@ async def event_generator(result: dict):
 @app.get("/chat-stream")
 async def chat_stream(query: str, session_id: str):
 
+    # session_id = "user2"  # For testing, override with a fixed session ID
+
     logging.info(f"Received query: {query}")
 
     try:
