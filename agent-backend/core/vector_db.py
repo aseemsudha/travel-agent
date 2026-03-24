@@ -215,46 +215,90 @@ def get_oldest_memories(session_id):
 
     
 
-def maintain_memory(session_id):
-
+# -----------------------------
+# Maintain memory limits
+# -----------------------------
+def maintain_memory(session_id=None):
+    """
+    Summarize and delete old memories if memory count exceeds threshold.
+    If session_id is provided, only consider that session.
+    """
     collection = get_memory_collection()
 
-    results = collection.get(
-        where={
-            "session_id": session_id
-        },
-        include=["ids"]
-    )
+    # Retrieve all memories or session-specific memories
+    if session_id:
+        results = collection.get(
+            where={"session_id": session_id},
+            limit=MEMORY_SUMMARY_BATCH_SIZE,
+            include=["documents", "metadatas"]
+        )
+    else:
+        results = collection.get(
+            limit=MEMORY_SUMMARY_BATCH_SIZE,
+            include=["documents", "metadatas"]
+        )
 
-    memory_ids = results.get("ids", [])
+    documents = results.get("documents", [])
+    metadatas = results.get("metadatas", [])
 
-    memory_count = len(memory_ids)
-
-    print("Memory count for session:", session_id, memory_count)
+    memory_count = len(documents)
+    print("Memory count:", memory_count)
 
     if memory_count <= MEMORY_MAX_RECORDS:
-        return
+        return  # No action needed
 
     print("Memory limit exceeded. Running summarization...")
 
-    documents, ids = get_oldest_memories(session_id)
+    # Summarize oldest memories
+    summary_text = "Summary of past user memories:\n"
+    for doc in documents:
+        summary_text += f"- {doc}\n"
 
-    summary = summarize_memories(documents)
+    # Store summary as a new memory
+    if session_id:
+        summary_metadata = {"session_id": session_id, "type": "summary"}
+    else:
+        summary_metadata = {"type": "summary"}
 
-    if summary:
+    # Add summary without triggering another maintenance loop
+    collection.add(
+        documents=[summary_text],
+        embeddings=[model.encode(summary_text).tolist()],
+        metadatas=[summary_metadata],
+        ids=[str(uuid.uuid4())]
+    )
 
-        save_memory(
-            summary,
-            {
-                "session_id": session_id,
-                "type": "summary"
-            }
-        )
-
-        delete_old_memories(ids)
+    # Delete old memories
+    ids_to_delete = [md["id"] for md in metadatas if "id" in md]
+    if ids_to_delete:
+        collection.delete(ids=ids_to_delete)
+        print(f"Deleted {len(ids_to_delete)} old memories.")
 
 def store_memory(text, metadata):
+    """
+    Add a memory and maintain limits.
+    """
+    collection = get_memory_collection()
+    memory_id = str(uuid.uuid4())
 
-    save_memory(text, metadata)
+    full_metadata = metadata.copy()
+    full_metadata.update({
+        "timestamp": time.time(),
+        "ttl_days": MEMORY_TTL_DAYS,
+        "id": memory_id
+    })
 
-    maintain_memory(metadata["session_id"])
+    embedding = model.encode(text).tolist()
+
+    collection.add(
+        documents=[text],
+        embeddings=[embedding],
+        metadatas=[full_metadata],
+        ids=[memory_id]
+    )
+
+    print("Memory stored:", text)
+    print("Memory count:", collection.count())
+
+    # Trigger maintenance
+    maintain_memory(full_metadata.get("session_id"))
