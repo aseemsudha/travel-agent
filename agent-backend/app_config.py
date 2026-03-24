@@ -25,7 +25,7 @@ COLLECTION_NAME = os.getenv(
 
 CHROMA_PATH = os.getenv(
     "CHROMA_PATH",
-    "./core/chroma"
+    "chroma"
 )
 
 # -----------------------------

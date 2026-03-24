@@ -75,21 +75,30 @@ def memory_node(state: AgentState):
     session_id = state["session_id"]
     query = state["query"]
 
-    obs.log("memory", {
-        "query": query,
-        "session_id": session_id
-    })
+    obs.log(
+        "memory",
+        {
+            "query": query,
+            "session_id": session_id
+        }
+    )
 
-    # Session history (always load)
+    # -------------------------
+    # ALWAYS load session history
+    # -------------------------
+
     history = get_memory(session_id)
 
     history_text = (
         "\n".join(history[-5:])
         if history
-        else "No history"
+        else ""
     )
 
-    # Semantic memory (vector search)
+    # -------------------------
+    # Semantic memory search
+    # -------------------------
+
     relevant_memories = search_memory(
         query,
         k=5
@@ -101,7 +110,10 @@ def memory_node(state: AgentState):
         else ""
     )
 
-    # Combine BOTH
+    # -------------------------
+    # Combine both
+    # -------------------------
+
     state["memory_context"] = f"""
         Recent Conversation:
         {history_text}

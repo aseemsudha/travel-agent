@@ -18,7 +18,7 @@ model = SentenceTransformer(
 # -----------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-persist_dir = os.path.join(BASE_DIR, "chroma")
+persist_dir = os.path.join(BASE_DIR, CHROMA_PATH)
 print("BASE_DIR path:", BASE_DIR)
 
 print("Chroma path:", persist_dir)
