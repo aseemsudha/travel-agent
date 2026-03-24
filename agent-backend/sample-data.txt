@@ -200,3 +200,8 @@ ALWAYS produces:
 Thought:
 Action:
 Action Input:
+
+Remember my preference - VIP Darshan
+What is my preference?
+Plan Nashik temple visit
+Did you consider my preference?

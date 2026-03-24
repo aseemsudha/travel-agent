@@ -4,6 +4,7 @@ import requests
 import os
 from datetime import datetime
 from core.knowledge_rag import search_knowledge
+from app_config import DEFAULT_PREFERENCE
 
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 
@@ -25,7 +26,7 @@ def safe_get(url, params):
 def smart_place_recommender(tool_input: dict):
     city = tool_input.get("city", "")
     category = tool_input.get("category", "tourist places")
-    preference = tool_input.get("preference", "balanced")
+    preference = tool_input.get("preference", DEFAULT_PREFERENCE)
 
     url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
     query = f"{category} in {city}"

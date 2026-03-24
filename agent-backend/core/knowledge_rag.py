@@ -3,7 +3,7 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 import os
 from core.vector_db import add_knowledge, search_knowledge, get_knowledge_collection
-from app_config import KNOWLEDGE_DIR, TOP_K
+from app_config import KNOWLEDGE_DIR, TOP_K, CHUNK_SIZE
 
 collection = get_knowledge_collection()
 
@@ -71,7 +71,7 @@ def search_knowledge(query, source_filter=None):
 
     return final_results
 
-def chunk_text(text, chunk_size=300):
+def chunk_text(text, chunk_size=CHUNK_SIZE):
 
     chunks = []
 

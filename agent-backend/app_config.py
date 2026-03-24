@@ -37,6 +37,10 @@ EMBEDDING_MODEL = os.getenv(
     "all-MiniLM-L6-v2"
 )
 
+EMBEDDING_DIMENSION = int(
+    os.getenv("EMBEDDING_DIMENSION", 384)
+)
+
 LLM_MODEL = os.getenv(
     "LLM_MODEL",
     "gemini-2.5-flash"
@@ -62,6 +66,11 @@ RECURSION_LIMIT = int(
     os.getenv("RECURSION_LIMIT", 10)
 )
 
+DEFAULT_PREFERENCE = os.getenv(
+    "DEFAULT_PREFERENCE",
+    "balanced"
+)
+
 # -----------------------------
 # Paths
 # -----------------------------
@@ -69,4 +78,8 @@ RECURSION_LIMIT = int(
 KNOWLEDGE_DIR = os.getenv(
     "KNOWLEDGE_DIR",
     "knowledge"
+)
+
+CHUNK_SIZE = int(
+    os.getenv("CHUNK_SIZE", 300)
 )

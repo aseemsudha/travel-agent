@@ -69,19 +69,50 @@ class AgentState(TypedDict):
 # =====================================================
 @traceable(name="memory_node")
 def memory_node(state: AgentState):
+
     obs = state["trace"]
-    obs.log("memory", {"query": state["query"]})
 
     session_id = state["session_id"]
     query = state["query"]
 
+    obs.log("memory", {
+        "query": query,
+        "session_id": session_id
+    })
+
+    # Session history (always load)
     history = get_memory(session_id)
-    history_text = "\n".join(history) if history else "No history"
 
-    relevant_memories = search_memory(query)
-    memory_context = "\n".join(relevant_memories) if relevant_memories else "No memory"
+    history_text = (
+        "\n".join(history[-5:])
+        if history
+        else "No history"
+    )
 
-    state["memory_context"] = f"{history_text}\n{memory_context}"
+    # Semantic memory (vector search)
+    relevant_memories = search_memory(
+        query,
+        k=5
+    )
+
+    memory_text = (
+        "\n".join(relevant_memories)
+        if relevant_memories
+        else ""
+    )
+
+    # Combine BOTH
+    state["memory_context"] = f"""
+        Recent Conversation:
+        {history_text}
+
+        Relevant Preferences:
+        {memory_text}
+    """
+
+    print("MEMORY CONTEXT:")
+    print(state["memory_context"])
+
     return state
 
 

@@ -119,7 +119,7 @@ async def chat_stream(query: str, session_id: str):
             ),
             timeout=60
         )
-
+        print("SESSION ID:", session_id)
         return EventSourceResponse(
             event_generator(result)
         )
