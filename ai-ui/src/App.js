@@ -22,23 +22,52 @@ function App() {
   const eventSourceRef = useRef(null);
 
   useEffect(() => {
-  const fetchSession = async () => {
-    try {
-      // Example: fetch sessionId from backend
-      const res = await fetch("http://127.0.0.1:8000/api/get-session-id");
-      const data = await res.json();
-      setSessionId(data.session_id);
-      console.log("Session ID set to:", data.session_id);
-
-      // setSessionId("user3"); // MOCK: replace with real session logic
-      // console.log("Session ID set to:", sessionId);
-    } catch (e) {
-      console.error("Failed to get session id", e);
+  const initializeSession = async () => {
+    let storedSession = localStorage.getItem("session_id");
+    if (!storedSession) {
+      try {
+        const res = await fetch("http://127.0.0.1:8000/api/get-session-id");
+        const data = await res.json();
+        storedSession = data.session_id;
+        localStorage.setItem("session_id", storedSession);
+      } catch (e) {
+        console.error("Failed to fetch session ID", e);
+        return;
+      }
     }
+    setSessionId(storedSession);
+    console.log("Session ID:", storedSession);
   };
 
-  fetchSession();
+  initializeSession();
 }, []);
+
+//   useEffect(() => {
+//   const fetchSession = async () => {
+//     try {
+//       // Example: fetch sessionId from backend
+//       const res = await fetch("http://127.0.0.1:8000/api/get-session-id");
+//       const data = await res.json();
+//       setSessionId(data.session_id);
+//       console.log("Session ID set to:", data.session_id);
+
+//       // setSessionId("user3"); // MOCK: replace with real session logic
+//       // console.log("Session ID set to:", sessionId);
+//     } catch (e) {
+//       console.error("Failed to get session id", e);
+//     }
+//   };
+
+//   fetchSession();
+// }, []);
+
+  useEffect(() => {
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -205,7 +234,7 @@ function App() {
   // Send Message (SSE)
   // -------------------------------
   const sendMessage = () => {
-    if (!input.trim() || loading) return;
+    if (!input.trim() || loading || !sessionId) return;
 
     const userMessage = { role: "user", text: input };
     const currentInput = input;
@@ -353,7 +382,7 @@ function App() {
 
       <button
         onClick={sendMessage}
-        disabled={loading}
+        disabled={loading || !sessionId}
         style={{
           padding: "10px 15px",
           marginLeft: "10px",
@@ -366,9 +395,33 @@ function App() {
       >
         {loading ? "..." : "Send"}
       </button>
-      <div style={{ marginTop: "10px" }}>
-        {sessionId && <DeleteMemoryButton sessionId={sessionId} />}
-      </div>
+      <DeleteMemoryButton
+        sessionId={sessionId}
+        onDeleted={async () => {
+          try {
+            setMessages([]);
+
+            // remove old session
+            localStorage.removeItem("session_id");
+
+            const res = await fetch(
+              "http://127.0.0.1:8000/api/get-session-id"
+            );
+
+            const data = await res.json();
+
+            localStorage.setItem(
+              "session_id",
+              data.session_id
+            );
+
+            setSessionId(data.session_id);
+
+          } catch (err) {
+            console.error("Failed to create new session", err);
+          }
+        }}
+      />
     </div>
   );
 }

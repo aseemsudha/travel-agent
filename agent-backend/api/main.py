@@ -26,6 +26,9 @@ from core.langgraph_agent import run_langgraph_agent
 from core.knowledge_rag import load_knowledge
 
 from api.memory_deletion import router as memory_router
+from api.session import router as session_router
+
+
 
 
 ######to test vertex AI is working or not######
@@ -46,6 +49,7 @@ from api.memory_deletion import router as memory_router
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
 app.include_router(memory_router, prefix="/api")
+app.include_router(session_router, prefix="/api")
 
 # -------------------------------
 # CORS
@@ -156,7 +160,8 @@ async def chat_stream(query: str, session_id: str):
 
         return EventSourceResponse(error())
 
-@app.get("/api/get-session-id")
-def get_session():
-    # This could come from login info or user database
-    return {"session_id": "user3"} 
+
+# @app.get("/api/get-session-id")
+# def get_session():
+#     # This could come from login info or user database
+#     return {"session_id": "user3"} 
