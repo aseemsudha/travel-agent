@@ -83,3 +83,30 @@ KNOWLEDGE_DIR = os.getenv(
 CHUNK_SIZE = int(
     os.getenv("CHUNK_SIZE", 300)
 )
+
+# -----------------------------
+# Observability
+# -----------------------------
+
+# -----------------------------
+# Observability
+# -----------------------------
+
+ENABLE_OBSERVABILITY_LOGGING = (
+    os.getenv(
+        "ENABLE_OBSERVABILITY_LOGGING",
+        "true"
+    ).lower() == "true"
+)
+
+ENABLE_LANGSMITH_TRACING = (
+    os.getenv(
+        "ENABLE_LANGSMITH_TRACING",
+        "false"
+    ).lower() == "true"
+)
+
+LANGSMITH_PROJECT = os.getenv(
+    "LANGSMITH_PROJECT",
+    "travel-agent"
+)
