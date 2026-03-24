@@ -87,26 +87,4 @@ CHUNK_SIZE = int(
 # -----------------------------
 # Observability
 # -----------------------------
-
-# -----------------------------
-# Observability
-# -----------------------------
-
-ENABLE_OBSERVABILITY_LOGGING = (
-    os.getenv(
-        "ENABLE_OBSERVABILITY_LOGGING",
-        "true"
-    ).lower() == "true"
-)
-
-ENABLE_LANGSMITH_TRACING = (
-    os.getenv(
-        "ENABLE_LANGSMITH_TRACING",
-        "false"
-    ).lower() == "true"
-)
-
-LANGSMITH_PROJECT = os.getenv(
-    "LANGSMITH_PROJECT",
-    "travel-agent"
-)
+ENABLE_OBSERVABILITY = True

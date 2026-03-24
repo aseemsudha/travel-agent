@@ -24,7 +24,6 @@ import logging
 
 from core.langgraph_agent import run_langgraph_agent
 from core.knowledge_rag import load_knowledge
-from core.observability import Observability
 
 ######to test vertex AI is working or not######
 # from core.llm import call_llm
@@ -43,7 +42,6 @@ from core.observability import Observability
 
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
-observability = Observability()
 
 # -------------------------------
 # CORS
