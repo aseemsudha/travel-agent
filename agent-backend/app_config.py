@@ -109,3 +109,5 @@ MEMORY_TTL_DAYS = int(
 
 # Whether to automatically delete expired memories
 MEMORY_DELETE_EXPIRED = True
+
+MEMORY_USER_CAN_DELETE = True

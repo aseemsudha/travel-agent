@@ -10,14 +10,35 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import MapView from "./MapView";
+import DeleteMemoryButton from "./DeleteMemoryButton";
 
 function App() {
+  const [sessionId, setSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
   const chatEndRef = useRef(null);
   const eventSourceRef = useRef(null);
+
+  useEffect(() => {
+  const fetchSession = async () => {
+    try {
+      // Example: fetch sessionId from backend
+      const res = await fetch("http://127.0.0.1:8000/api/get-session-id");
+      const data = await res.json();
+      setSessionId(data.session_id);
+      console.log("Session ID set to:", data.session_id);
+
+      // setSessionId("user3"); // MOCK: replace with real session logic
+      // console.log("Session ID set to:", sessionId);
+    } catch (e) {
+      console.error("Failed to get session id", e);
+    }
+  };
+
+  fetchSession();
+}, []);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -206,7 +227,7 @@ function App() {
     const eventSource = new EventSource(
       `http://127.0.0.1:8000/chat-stream?query=${encodeURIComponent(
         currentInput
-      )}&session_id=user1`
+      )}&session_id=${sessionId}` // <-- dynamic
     );
 
     eventSourceRef.current = eventSource;
@@ -345,6 +366,9 @@ function App() {
       >
         {loading ? "..." : "Send"}
       </button>
+      <div style={{ marginTop: "10px" }}>
+        {sessionId && <DeleteMemoryButton sessionId={sessionId} />}
+      </div>
     </div>
   );
 }
