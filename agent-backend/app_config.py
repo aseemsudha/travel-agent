@@ -88,3 +88,21 @@ CHUNK_SIZE = int(
 # Observability
 # -----------------------------
 ENABLE_OBSERVABILITY = True
+
+# =============================
+# MEMORY CONFIGURATION
+# =============================
+
+MEMORY_MAX_RECORDS = int(os.getenv("MEMORY_MAX_RECORDS", 100))
+
+MEMORY_SUMMARY_BATCH_SIZE = int(
+    os.getenv("MEMORY_SUMMARY_BATCH_SIZE", 50)
+)
+
+MEMORY_RETRIEVAL_LIMIT = int(
+    os.getenv("MEMORY_RETRIEVAL_LIMIT", 10)
+)
+
+MEMORY_TTL_DAYS = int(
+    os.getenv("MEMORY_TTL_DAYS", 30)
+)

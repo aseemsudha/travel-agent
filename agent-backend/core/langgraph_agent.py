@@ -30,7 +30,7 @@ from core.critic import run_critic
 
 from core.memory import get_memory
 from core.vector_db import (
-    save_memory,
+    store_memory,
     search_memory,
     get_memory_collection
 )
@@ -345,7 +345,7 @@ def critic_node(state: AgentState):
     state["final_answer"] = improved
 
     # Save memory
-    save_memory(
+    store_memory(
         f"user: {state['query']}",
         {
             "session_id": state["session_id"],
@@ -353,7 +353,7 @@ def critic_node(state: AgentState):
         }
     )
 
-    save_memory(
+    store_memory(
         f"agent: {improved}",
         {
             "session_id": state["session_id"],

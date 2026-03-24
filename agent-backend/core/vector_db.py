@@ -3,7 +3,8 @@ from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer
 import uuid
 import os
-from app_config import EMBEDDING_MODEL, COLLECTION_NAME, CHROMA_PATH
+from app_config import EMBEDDING_MODEL, COLLECTION_NAME, CHROMA_PATH, MEMORY_TTL_DAYS, MEMORY_SUMMARY_BATCH_SIZE, MEMORY_MAX_RECORDS
+import time
 
 
 # -----------------------------
@@ -108,21 +109,43 @@ def get_memory_collection():
     return collection
 
 def save_memory(text, metadata=None):
-    
 
     collection = get_memory_collection()
 
     embedding = model.encode(text).tolist()
 
+    metadata = metadata or {}
+
+    metadata.update({
+        "timestamp": time.time(),
+        "ttl_days": MEMORY_TTL_DAYS
+    })
+
     collection.add(
         documents=[text],
         embeddings=[embedding],
-        metadatas=[metadata or {}],
+        metadatas=[metadata],
         ids=[str(uuid.uuid4())]
     )
 
     print("Memory stored:", text)
     print("Memory count:", collection.count())
+
+# def save_memory(text, metadata=None):
+    
+#     collection = get_memory_collection()
+
+#     embedding = model.encode(text).tolist()
+
+#     collection.add(
+#         documents=[text],
+#         embeddings=[embedding],
+#         metadatas=[metadata or {}],
+#         ids=[str(uuid.uuid4())]
+#     )
+
+#     print("Memory stored:", text)
+#     print("Memory count:", collection.count())
 
 def search_memory(query, k=3):
 
@@ -142,3 +165,86 @@ def search_memory(query, k=3):
     print("Retrieved memory:", documents)
 
     return documents
+
+def get_memory_count():
+
+    collection = get_memory_collection()
+
+    count = collection.count()
+
+    print("Memory count:", count)
+
+    return count
+
+def summarize_memories(memories):
+
+    if not memories:
+        return None
+
+    summary_text = "Summary of past user memories:\n"
+
+    for m in memories:
+        summary_text += f"- {m}\n"
+
+    return summary_text
+
+def delete_old_memories(ids):
+
+    collection = get_memory_collection()
+
+    collection.delete(ids=ids)
+
+    print("Deleted old memories:", len(ids))
+
+def get_oldest_memories(session_id):
+
+    collection = get_memory_collection()
+
+    results = collection.get(
+        where={
+            "session_id": session_id
+        },
+        limit=MEMORY_SUMMARY_BATCH_SIZE,
+        include=["documents", "metadatas", "ids"]
+    )
+
+    documents = results.get("documents", [])
+    ids = results.get("ids", [])
+
+    return documents, ids
+
+    
+
+def maintain_memory(session_id):
+
+    collection = get_memory_collection()
+
+    memory_count = collection.count()
+
+    print("Memory count:", memory_count)
+
+    if memory_count <= MEMORY_MAX_RECORDS:
+        return
+
+    print("Memory limit exceeded. Running summarization...")
+
+    documents, ids = get_oldest_memories()
+
+    summary = summarize_memories(documents)
+
+    if summary:
+
+        save_memory(
+            summary,
+            {
+                "type": "summary"
+            }
+        )
+
+        delete_old_memories(ids)
+
+def store_memory(text, metadata):
+
+    save_memory(text, metadata)
+
+    maintain_memory(metadata["session_id"])
