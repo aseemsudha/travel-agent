@@ -29,9 +29,12 @@ from core.tool_registry import execute_tool
 from core.critic import run_critic
 
 from core.memory import get_memory
-from core.vector_db import save_memory
+from core.vector_db import (
+    save_memory,
+    search_memory,
+    get_memory_collection
+)
 from core.vector_memory import search_memory_faiss
-from core.vector_db import search_memory
 from core.knowledge_rag import search_knowledge
 from core.query_rewriter import rewrite_query
 from core.retry import fix_tool_input
@@ -99,14 +102,20 @@ def memory_node(state: AgentState):
     # Semantic memory search
     # -------------------------
 
-    relevant_memories = search_memory(
-        query,
-        k=5
+    collection = get_memory_collection()
+
+    results = collection.get(
+        where={
+            "session_id": session_id
+        },
+        limit=5
     )
 
+    documents = results.get("documents", [])
+
     memory_text = (
-        "\n".join(relevant_memories)
-        if relevant_memories
+        "\n".join(documents)
+        if documents
         else ""
     )
 
@@ -124,6 +133,9 @@ def memory_node(state: AgentState):
 
     print("MEMORY CONTEXT:")
     print(state["memory_context"])
+
+    print("SESSION:", session_id)
+    print("MEMORY RETRIEVED:", documents)
 
     return state
 
