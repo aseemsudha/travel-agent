@@ -219,16 +219,25 @@ def maintain_memory(session_id):
 
     collection = get_memory_collection()
 
-    memory_count = collection.count()
+    results = collection.get(
+        where={
+            "session_id": session_id
+        },
+        include=["ids"]
+    )
 
-    print("Memory count:", memory_count)
+    memory_ids = results.get("ids", [])
+
+    memory_count = len(memory_ids)
+
+    print("Memory count for session:", session_id, memory_count)
 
     if memory_count <= MEMORY_MAX_RECORDS:
         return
 
     print("Memory limit exceeded. Running summarization...")
 
-    documents, ids = get_oldest_memories()
+    documents, ids = get_oldest_memories(session_id)
 
     summary = summarize_memories(documents)
 
@@ -237,6 +246,7 @@ def maintain_memory(session_id):
         save_memory(
             summary,
             {
+                "session_id": session_id,
                 "type": "summary"
             }
         )
