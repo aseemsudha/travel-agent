@@ -3,7 +3,7 @@ from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer
 import uuid
 import os
-from app_config import EMBEDDING_MODEL, COLLECTION_NAME, CHROMA_PATH, MEMORY_TTL_DAYS, MEMORY_SUMMARY_BATCH_SIZE, MEMORY_MAX_RECORDS
+from app_config import EMBEDDING_MODEL, COLLECTION_NAME, CHROMA_PATH, MEMORY_TTL_DAYS, MEMORY_SUMMARY_BATCH_SIZE, MEMORY_MAX_RECORDS, MEMORY_DELETE_EXPIRED, MEMORY_TTL_DAYS
 import time
 
 
@@ -218,14 +218,20 @@ def get_oldest_memories(session_id):
 # -----------------------------
 # Maintain memory limits
 # -----------------------------
-def maintain_memory(session_id=None):
+
+def maintain_memory(session_id=None, auto_delete_expired=MEMORY_DELETE_EXPIRED):
     """
-    Summarize and delete old memories if memory count exceeds threshold.
-    If session_id is provided, only consider that session.
+    Maintain user memories:
+    1. Delete expired memories (TTL-based) if auto_delete_expired is True
+    2. Summarize oldest memories if memory count exceeds MEMORY_MAX_RECORDS
+    3. Works for a specific session_id if provided, else all memories
     """
     collection = get_memory_collection()
+    current_time = time.time()
 
-    # Retrieve all memories or session-specific memories
+    # -----------------------
+    # Fetch memories
+    # -----------------------
     if session_id:
         results = collection.get(
             where={"session_id": session_id},
@@ -241,64 +247,89 @@ def maintain_memory(session_id=None):
     documents = results.get("documents", [])
     metadatas = results.get("metadatas", [])
 
+    # Ensure each memory has an 'id' in metadata
+    for md in metadatas:
+        if "id" not in md:
+            md["id"] = str(uuid.uuid4())
+
+    # -----------------------
+    # Delete expired memories
+    # -----------------------
+    if auto_delete_expired:
+        expired_ids = []
+        for meta in metadatas:
+            ttl_days = meta.get("ttl_days", MEMORY_TTL_DAYS)
+            timestamp = meta.get("timestamp", current_time)
+            if (current_time - timestamp) > ttl_days * 86400:  # convert days to seconds
+                expired_ids.append(meta["id"])
+
+        if expired_ids:
+            collection.delete(ids=expired_ids)
+            print(f"Deleted {len(expired_ids)} expired memories.")
+
+        # Refresh documents/metadatas after deletion
+        documents = [doc for doc, meta in zip(documents, metadatas) if meta["id"] not in expired_ids]
+        metadatas = [meta for meta in metadatas if meta["id"] not in expired_ids]
+
     memory_count = len(documents)
-    print("Memory count:", memory_count)
+    print(f"Memory count (after TTL cleanup) for session {session_id}: {memory_count}")
 
-    if memory_count <= MEMORY_MAX_RECORDS:
-        return  # No action needed
+    # -----------------------
+    # Summarize oldest memories if over limit
+    # -----------------------
+    if memory_count > MEMORY_MAX_RECORDS:
+        print("Memory limit exceeded. Creating summary...")
 
-    print("Memory limit exceeded. Running summarization...")
+        # Create summary text
+        summary_text = "Summary of past user memories:\n"
+        for doc in documents:
+            summary_text += f"- {doc}\n"
 
-    # Summarize oldest memories
-    summary_text = "Summary of past user memories:\n"
-    for doc in documents:
-        summary_text += f"- {doc}\n"
+        # Prepare summary metadata
+        summary_metadata = {"type": "summary", "timestamp": current_time, "ttl_days": MEMORY_TTL_DAYS}
+        if session_id:
+            summary_metadata["session_id"] = session_id
+        summary_id = str(uuid.uuid4())
+        summary_metadata["id"] = summary_id
 
-    # Store summary as a new memory
-    if session_id:
-        summary_metadata = {"session_id": session_id, "type": "summary"}
-    else:
-        summary_metadata = {"type": "summary"}
+        # Store summary as new memory
+        collection.add(
+            documents=[summary_text],
+            embeddings=[model.encode(summary_text).tolist()],
+            metadatas=[summary_metadata],
+            ids=[summary_id]
+        )
+        print("Summary stored as a new memory.")
 
-    # Add summary without triggering another maintenance loop
-    collection.add(
-        documents=[summary_text],
-        embeddings=[model.encode(summary_text).tolist()],
-        metadatas=[summary_metadata],
-        ids=[str(uuid.uuid4())]
-    )
+        # Delete old memories that were summarized
+        old_ids = [meta["id"] for meta in metadatas]
+        if old_ids:
+            collection.delete(ids=old_ids)
+            print(f"Deleted {len(old_ids)} old memories after summarization.")
 
-    # Delete old memories
-    ids_to_delete = [md["id"] for md in metadatas if "id" in md]
-    if ids_to_delete:
-        collection.delete(ids=ids_to_delete)
-        print(f"Deleted {len(ids_to_delete)} old memories.")
 
 def store_memory(text, metadata):
     """
-    Add a memory and maintain limits.
+    Store a memory and trigger maintenance
+    - text: memory content
+    - metadata: dict, must include "session_id" for session-specific memory
     """
     collection = get_memory_collection()
-    memory_id = str(uuid.uuid4())
-
-    full_metadata = metadata.copy()
+    full_metadata = metadata.copy() if metadata else {}
     full_metadata.update({
         "timestamp": time.time(),
-        "ttl_days": MEMORY_TTL_DAYS,
-        "id": memory_id
+        "ttl_days": full_metadata.get("ttl_days", MEMORY_TTL_DAYS)
     })
-
-    embedding = model.encode(text).tolist()
 
     collection.add(
         documents=[text],
-        embeddings=[embedding],
+        embeddings=[model.encode(text).tolist()],
         metadatas=[full_metadata],
-        ids=[memory_id]
+        ids=[str(uuid.uuid4())]
     )
 
     print("Memory stored:", text)
     print("Memory count:", collection.count())
 
-    # Trigger maintenance
-    maintain_memory(full_metadata.get("session_id"))
+    # Maintain memory after adding
+    maintain_memory(session_id=full_metadata.get("session_id"), auto_delete_expired=True)

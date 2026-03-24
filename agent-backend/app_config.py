@@ -106,3 +106,6 @@ MEMORY_RETRIEVAL_LIMIT = int(
 MEMORY_TTL_DAYS = int(
     os.getenv("MEMORY_TTL_DAYS", 30)
 )
+
+# Whether to automatically delete expired memories
+MEMORY_DELETE_EXPIRED = True
