@@ -2,6 +2,7 @@ import os
 import json
 import time
 import uuid
+from app_config import ENABLE_OBSERVABILITY
 
 
 class Observability:
