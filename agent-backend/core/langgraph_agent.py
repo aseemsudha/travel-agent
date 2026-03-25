@@ -49,6 +49,7 @@ from llmops.observability import Observability as LLMObs
 from langsmith import traceable
 
 from app_config import RECURSION_LIMIT
+from core.tool_retry import safe_tool_call
 
 
 
@@ -275,16 +276,31 @@ def tool_node(state: AgentState):
         state["error"] = f"Invalid JSON input: {str(e)}"
         return state
 
-    try:
-        result = execute_tool(tool_name, tool_input)
-        if isinstance(result, dict) and "error" in result:
-            state["error"] = result["error"]
-        else:
-            state["tool_output"] = result
-            state["error"] = ""
-    except Exception as e:
-        state["error"] = f"Tool execution failed: {str(e)}"
-        return state
+    result = safe_tool_call(
+        execute_tool,
+        tool_name,
+        tool_input
+    )
+
+    if isinstance(result, dict) and "error" in result:
+
+        state["error"] = result["error"]
+
+    else:
+
+        state["tool_output"] = result
+        state["error"] = ""
+
+    # try:
+    #     result = execute_tool(tool_name, tool_input)
+    #     if isinstance(result, dict) and "error" in result:
+    #         state["error"] = result["error"]
+    #     else:
+    #         state["tool_output"] = result
+    #         state["error"] = ""
+    # except Exception as e:
+    #     state["error"] = f"Tool execution failed: {str(e)}"
+    #     return state
 
     state["messages"].append({"role": "system", "content": f"Observation: {result}"})
     obs.log("tool", {"tool": tool_name, "input": tool_input, "output": result, "error": state.get("error")})
