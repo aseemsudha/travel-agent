@@ -27,6 +27,7 @@ from core.knowledge_rag import load_knowledge
 
 from api.memory_deletion import router as memory_router
 from api.session import router as session_router
+from core.intent_validator import validate_product_intent
 
 
 
@@ -114,12 +115,48 @@ async def event_generator(result: dict):
 # -------------------------------
 @app.get("/chat-stream")
 async def chat_stream(query: str, session_id: str):
-
     # session_id = "user3"  # For testing, override with a fixed session ID
 
     logging.info(f"Received query: {query}")
 
     try:
+
+        # ----------------------------------
+        # INTENT VALIDATION — restricting to travel-related queries only
+        # ----------------------------------
+
+
+
+        is_travel, intent = validate_product_intent(query)
+
+        print("INTENT:", intent)
+        print("SESSION ID:", session_id)
+
+        if not is_travel:
+
+            async def non_travel():
+
+                message = (
+                    "I specialize in travel-related assistance only. "
+                    "Please ask about flights, hotels, destinations, "
+                    "or trip planning."
+                )
+
+                yield {
+                    "event": "message",
+                    "data": message
+                }
+
+                yield {
+                    "event": "end",
+                    "data": "[DONE]"
+                }
+
+            return EventSourceResponse(non_travel())
+
+        # ----------------------------------
+        # RUN LANGGRAPH
+        # ----------------------------------
 
         result = await asyncio.wait_for(
             asyncio.to_thread(
@@ -129,7 +166,7 @@ async def chat_stream(query: str, session_id: str):
             ),
             timeout=60
         )
-        print("SESSION ID:", session_id)
+
         return EventSourceResponse(
             event_generator(result)
         )
@@ -159,6 +196,56 @@ async def chat_stream(query: str, session_id: str):
             }
 
         return EventSourceResponse(error())
+
+
+
+# @app.get("/chat-stream")
+# async def chat_stream(query: str, session_id: str):
+
+#     # session_id = "user3"  # For testing, override with a fixed session ID
+
+#     logging.info(f"Received query: {query}")
+
+#     try:
+
+#         result = await asyncio.wait_for(
+#             asyncio.to_thread(
+#                 run_langgraph_agent,
+#                 query,
+#                 session_id
+#             ),
+#             timeout=60
+#         )
+#         print("SESSION ID:", session_id)
+#         return EventSourceResponse(
+#             event_generator(result)
+#         )
+
+#     except Exception as e:
+
+#         import traceback
+
+#         error_text = str(e) or "Unknown error"
+
+#         logging.error(
+#             f"Error in chat_stream: {error_text}"
+#         )
+
+#         traceback.print_exc()
+
+#         async def error():
+
+#             yield {
+#                 "event": "message",
+#                 "data": f"Error: {error_text}"
+#             }
+
+#             yield {
+#                 "event": "end",
+#                 "data": "[DONE]"
+#             }
+
+#         return EventSourceResponse(error())
 
 
 # @app.get("/api/get-session-id")

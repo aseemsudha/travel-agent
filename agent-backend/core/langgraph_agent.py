@@ -51,6 +51,7 @@ from langsmith import traceable
 from app_config import RECURSION_LIMIT
 
 
+
 # =====================================================
 # STATE
 # =====================================================
@@ -457,6 +458,39 @@ def run_langgraph_agent(query: str, session_id: str):
         "final_answer": "",
         "trace": obs
     }
+
+    # ----------------------------------
+    # INTENT VALIDATION
+    # ----------------------------------
+
+    # is_travel, intent = validate_product_intent(query)
+
+    # if not is_travel:
+
+    #     return {
+    #         "answer": (
+    #             "I specialize in travel-related assistance only. "
+    #             "Please ask about flights, hotels, destinations, "
+    #             "or trip planning."
+    #         ),
+    #         "structured_answer": {
+    #             "answer": (
+    #                 "I specialize in travel-related assistance only. "
+    #                 "Please ask about flights, hotels, destinations, "
+    #                 "or trip planning."
+    #             ),
+    #             "cards": [],
+    #             "map": None,
+    #             "tips": [
+    #                 "Search flights",
+    #                 "Find hotels",
+    #                 "Plan itinerary",
+    #                 "Explore destinations"
+    #             ]
+    #         },
+    #         "trace": [],
+    #         "summary": {}
+    #     }
 
     state = graph.invoke(
         state,
