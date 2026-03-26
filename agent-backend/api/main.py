@@ -5,7 +5,14 @@
 # touch apps/__init__.py 
 # touch core/__init__.py
 # touch api/__init__.py 
+# touch apps/travel_assistant/prompts/__init__.py
 # streamlit run dashboard.py
+
+
+###prompt selection integration
+#####graph.py langgraph mapping
+#### weird response smart toll has alreeady answered
+### product improvements
 
 ####changes for Vertex AI####
 # .env changes

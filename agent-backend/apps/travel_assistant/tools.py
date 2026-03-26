@@ -24,6 +24,7 @@ def safe_get(url, params):
 # CORE RECOMMENDER
 # =====================================================
 def smart_place_recommender(tool_input: dict):
+    print("SSSRunninggggggggggggggggggggggggggggggg")
     city = tool_input.get("city", "")
     category = tool_input.get("category", "tourist places")
     preference = tool_input.get("preference", DEFAULT_PREFERENCE)

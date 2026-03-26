@@ -48,8 +48,12 @@ from llmops.observability import Observability as LLMObs
 
 from langsmith import traceable
 
-from app_config import RECURSION_LIMIT
+from app_config import RECURSION_LIMIT, LLM_MODEL
 from core.tool_retry import safe_tool_call
+
+from core.logger import logger
+import time
+from apps.travel_assistant.prompts.prompts import get_prompt
 
 
 
@@ -76,6 +80,7 @@ class AgentState(TypedDict):
 def memory_node(state: AgentState):
 
     obs = state["trace"]
+    start = time.time()
 
     session_id = state["session_id"]
     query = state["query"]
@@ -133,6 +138,17 @@ def memory_node(state: AgentState):
         {memory_text}
     """
 
+    latency = int((time.time() - start) * 1000)
+
+    logger.log(
+        event="memory_retrieval",
+        session_id=session_id,
+        node="memory",
+        history_count=len(history),
+        semantic_count=len(documents),
+        latency_ms=latency
+    )
+
     print("MEMORY CONTEXT:")
     print(state["memory_context"])
 
@@ -150,15 +166,26 @@ def rag_node(state: AgentState):
     obs = state["trace"]
     obs.log("rag", {"query": state["query"]})
 
+    start = time.time()
     query = state["query"]
     search_query = rewrite_query(query)
     knowledge_results = search_knowledge(search_query)
+
+    latency = int((time.time() - start) * 1000)
 
     knowledge_text = "\n".join(
         [k["text"] if isinstance(k, dict) else str(k) for k in knowledge_results]
     ) if knowledge_results else "No knowledge found"
 
     state["knowledge_context"] = knowledge_text
+
+    logger.log(
+        event="rag_retrieval",
+        session_id=state["session_id"],
+        node="rag",
+        documents_found=len(knowledge_results),
+        latency_ms=latency
+    )
     return state
 
 
@@ -168,7 +195,8 @@ def rag_node(state: AgentState):
 @traceable(name="agent_node")
 def agent_node(state: AgentState):
     print("Running AGENT node")
-    state["retry_count"] = state.get("retry_count", 0) + 1
+    # state["retry_count"] = state.get("retry_count", 0) + 1
+    state.setdefault("retry_count", 0)
 
     print(
         f"AGENT STEP:",
@@ -179,6 +207,11 @@ def agent_node(state: AgentState):
     memory = state.get("memory_context", "")
     knowledge = state.get("knowledge_context", "")
     tool_output = state.get("tool_output", {})
+    history = state.get("memory_context", "")
+    scratchpad = "\n".join(
+        msg["content"]
+        for msg in state["messages"]
+    )
 
     json_instruction = {
         "answer": "<plain text answer>",
@@ -187,63 +220,114 @@ def agent_node(state: AgentState):
         "tips": ["tip 1", "tip 2"]
     }
 
-    prompt = f"""
-        You are an AI travel assistant.
+    prompt_template = get_prompt("agent_prompt_v1")
 
-        You MUST consider the user's previous preferences and conversation history when generating the response.
+    prompt = prompt_template.format(
+        history=history,
+        memory=memory,
+        knowledge=knowledge,
+        query=query,
+        scratchpad=scratchpad
+    )
 
-        User Memory:
-        {memory}
+    # prompt = f"""
+    #     You are an AI travel assistant.
 
-        Relevant Knowledge:
-        {knowledge}
+    #     You MUST consider the user's previous preferences and conversation history when generating the response.
 
-        User Query:
-        {query}
+    #     User Memory:
+    #     {memory}
 
-        You MUST return ONLY valid JSON.
+    #     Relevant Knowledge:
+    #     {knowledge}
 
-        Do NOT write explanations.
-        Do NOT write markdown.
-        Do NOT write text before or after JSON.
+    #     User Query:
+    #     {query}
 
-        Return exactly this format:
+    #     You MUST return ONLY valid JSON.
 
-        {json.dumps(json_instruction, indent=4)}
+    #     Do NOT write explanations.
+    #     Do NOT write markdown.
+    #     Do NOT write text before or after JSON.
 
-        If information is missing, still generate a useful plan.
-    """
+    #     Return exactly this format:
+
+    #     {json.dumps(json_instruction, indent=4)}
+
+    #     If information is missing, still generate a useful plan.
+    # """
 
     # LLMOps observability
     llm_obs = LLMObs()
     llm_obs.log_event("llm_call", {"prompt": prompt[:200]})
+    
+    start = time.time()
 
     response = call_llm(prompt, obs=obs)
 
+    latency = int((time.time() - start) * 1000)
+
+    logger.log(
+        event="llm_call",
+        session_id=state["session_id"],
+        node="agent",
+        model=LLM_MODEL,
+        latency_ms=latency
+    )
+
     state["messages"].append({"role": "assistant", "content": response})
+
+    print("LLM RESPONSE:")
+    print(response)
 
     # Parse JSON safely
 
-    try:
+    cleaned = re.sub(
+        r"```json|```",
+        "",
+        response
+    ).strip()
 
-        cleaned = re.sub(
-            r"```json|```",
-            "",
-            response
-        ).strip()
+    # CASE 1 — Tool call
 
-        structured = json.loads(cleaned)
+    if "Action:" in cleaned:
 
-    except Exception as e:
+        structured = {}
 
-        print("JSON parse failed:", e)
+    # CASE 2 — Final answer text
+
+    elif "Final Answer:" in cleaned:
+
+        final_text = cleaned.split(
+            "Final Answer:",
+            1
+        )[1].strip()
 
         structured = {
-            "answer": cleaned if "cleaned" in locals() else response,
+            "answer": final_text,
             "cards": [],
             "map": None,
             "tips": []
         }
+
+    # CASE 3 — JSON response
+
+    else:
+
+        try:
+
+            structured = json.loads(cleaned)
+
+        except Exception as e:
+
+            print("JSON parse failed:", e)
+
+            structured = {
+                "answer": cleaned,
+                "cards": [],
+                "map": None,
+                "tips": []
+            }
 
     state["tool_output"] = structured
     obs.log("agent", {"response": response[:200]})
@@ -258,7 +342,11 @@ def tool_node(state: AgentState):
     print("Running TOOL node")
     import re, json
     obs = state["trace"]
-    last_message = state["messages"][-1]["content"]
+    last_message = (
+        state["messages"][-1]["content"]
+        if state["messages"]
+        else ""
+    )
 
     action_match = re.search(r"Action:\s*(.*)", last_message)
     input_match = re.search(r"Action Input:\s*(.*)", last_message)
@@ -276,10 +364,30 @@ def tool_node(state: AgentState):
         state["error"] = f"Invalid JSON input: {str(e)}"
         return state
 
+    start = time.time()
     result = safe_tool_call(
         execute_tool,
         tool_name,
         tool_input
+    )
+
+    latency = int((time.time() - start) * 1000)
+
+    status = (
+        "failed"
+        if isinstance(result, dict) and "error" in result
+        else "success"
+    )
+
+    
+    logger.log(
+        event="tool_execution",
+        session_id=state["session_id"],
+        node="tool",
+        tool=tool_name,
+        status = status,
+        latency_ms=latency,
+        error=result.get("error") if isinstance(result, dict) else None
     )
 
     if isinstance(result, dict) and "error" in result:
@@ -315,6 +423,8 @@ def retry_node(state: AgentState):
     import re
     obs = state["trace"]
     obs.log("retry", {"retry_count": state.get("retry_count", 0)})
+    start = time.time()
+    
 
     if state.get("retry_count", 0) >= 2:
         return state
@@ -333,6 +443,17 @@ def retry_node(state: AgentState):
 
     state["retry_count"] += 1
     state["error"] = ""
+
+    latency = int((time.time() - start) * 1000)
+    logger.log(
+        event="retry_attempt",
+        session_id=state["session_id"],
+        node="retry",
+        retry_count=state["retry_count"],
+        error=state.get("error"),
+        latency_ms=latency
+    )
+
     return state
 
 
@@ -346,8 +467,9 @@ def critic_node(state: AgentState):
 
     obs = state["trace"]
 
-    structured = state.get("tool_output", {})
+    start_time = time.time()
 
+    structured = state.get("tool_output", {})
     answer = structured.get("answer")
 
     if not answer:
@@ -385,12 +507,22 @@ def critic_node(state: AgentState):
         }
     )
 
+    latency = int((time.time() - start_time) * 1000)
+    logger.log(
+        event="final_response",
+        session_id=state["session_id"],
+        node="critic",
+        status="success",
+        latency_ms=latency,
+        response_length=len(state.get("final_answer", ""))
+    )
     return state
 
 # =====================================================
 # ROUTER
 # =====================================================
 def router(state: AgentState):
+    start = time.time()
 
     last_message = (
         state["messages"][-1]["content"]
@@ -400,23 +532,45 @@ def router(state: AgentState):
 
     retry_count = state.get("retry_count", 0)
 
+    # Default decision
+
+    decision = "critic"
+
     # If tool error → retry
+
     if state.get("error") and retry_count < 2:
-        return "retry"
+        decision = "retry"
 
     # If LLM produced action
-    if "Action:" in last_message:
-        return "tool"
 
-    # If structured answer exists → finish
-    if state.get("tool_output"):
-        return "critic"
+    elif "Action:" in last_message:
+        decision = "tool"
+
+    # If final answer detected
+
+    elif "Final Answer:" in last_message:
+        decision = "critic"
 
     # Safety stop
-    if retry_count >= 2:
-        return "critic"
 
-    return "critic"
+    elif retry_count >= RETRY_LIMIT:
+        decision = "critic"
+
+    latency = int((time.time() - start) * 1000)
+
+    # Log ONCE at the end
+
+    logger.log(
+        event="routing_decision",
+        session_id=state["session_id"],
+        node="router",
+        decision=decision,
+        retry_count=retry_count,
+        has_error=bool(state.get("error")),
+        latency_ms=latency
+    )
+
+    return decision
 
 
 # =====================================================
@@ -459,6 +613,7 @@ def build_graph():
 # =====================================================
 @traceable(name="run_langgraph_agent")
 def run_langgraph_agent(query: str, session_id: str):
+    start_time = time.time()
     graph = build_graph()
     obs = LGObs()  # LangGraph observability
 
@@ -521,9 +676,31 @@ def run_langgraph_agent(query: str, session_id: str):
 
     print("FINAL TOOL OUTPUT:", state.get("tool_output"))
 
+    total_latency = int((time.time() - start_time) * 1000)
+
+    logger.log(
+        event="request_completed",
+        session_id=session_id,
+        total_latency_ms=total_latency,
+        recursion_limit=RECURSION_LIMIT
+    )
+
+    final_answer = (
+        state.get("final_answer")
+        or state.get("tool_output", {}).get("answer")
+        or "No answer generated"
+    )
+
     return {
-        "answer": state.get("tool_output", {}).get("answer", "No answer generated"),
+        "answer": final_answer,
         "structured_answer": state.get("tool_output", {}),
         "trace": obs.get_trace(),
         "summary": obs.summary()
     }
+
+    # return {
+    #     "answer": state.get("tool_output", {}).get("answer", "No answer generated"),
+    #     "structured_answer": state.get("tool_output", {}),
+    #     "trace": obs.get_trace(),
+    #     "summary": obs.summary()
+    # }

@@ -1,5 +1,6 @@
-PROMPTS = {
+from typing import Dict
 
+PROMPTS: Dict[str, str] = {
     "agent_prompt_v1": """
         You are an intelligent AI Travel Assistant that can reason step-by-step and use tools.
 
@@ -16,47 +17,47 @@ PROMPTS = {
         smart_place_recommender:
         Generic place recommender (temples, restaurants, hotels, etc.)
         Input:
-        {"city": "city name", "category": "temple/restaurant/hotel", "preference": "quiet/crowded"}
+        {{"city": "city name", "category": "temple/restaurant/hotel", "preference": "quiet/crowded"}}
 
         smart_food_recommender:
         Find restaurants
         Input:
-        {"city": "city name", "preference": "quiet or crowded"}
+        {{"city": "city name", "preference": "quiet or crowded"}}
 
         smart_hotel_recommender:
         Find hotels
         Input:
-        {"city": "city name", "preference": "quiet or crowded"}
+        {{"city": "city name", "preference": "quiet or crowded"}}
 
         smart_temple_recommender:
         Find temples based on user preferences
         Input:
-        {"city": "city name", "preference": "quiet or crowded"}
+        {{"city": "city name", "preference": "quiet or crowded"}}
 
         google_maps_search:
         Search places using Google Maps
         Input:
-        {"query": "search query"}
+        {{"query": "search query"}}
 
         estimate_crowd:
         Estimate crowd level of a place
         Input:
-        {"place": "place name", "rating": optional, "reviews": optional}
+        {{"place": "place name", "rating": optional, "reviews": optional}}
 
         festival_detector:
         Detect festivals happening in a city
         Input:
-        {"city": "city name"}
+        {{"city": "city name"}}
 
         suggest_travel_plan:
         Generate a travel itinerary
         Input:
-        {"city": "city name", "interest": "user interest"}
+        {{"city": "city name", "interest": "user interest"}}
 
         retrieve_travel_knowledge:
         Retrieve travel-related knowledge
         Input:
-        {"query": "search query"}
+        {{"query": "search query"}}
 
         ---------------------
         TOOL USAGE GUIDELINES
@@ -65,10 +66,6 @@ PROMPTS = {
         - Use tools when real-world or specific data is needed
         - Choose the MOST relevant tool (avoid unnecessary tool calls)
         - ALWAYS prefer the most specific tool available
-            Example:
-            - For temples → use smart_temple_recommender
-            - For restaurants → use smart_food_recommender
-            - For hotels → use smart_hotel_recommender
         - Use smart_place_recommender ONLY when category is unclear
         - Do NOT call multiple tools unless absolutely required
         - If the query is informational, you may answer directly
@@ -126,9 +123,9 @@ PROMPTS = {
         {scratchpad}
 
         Respond with the next step.
-        """,
+    """,
 
-            "agent_prompt_v2": """
+    "agent_prompt_v2": """
         You are an advanced AI travel planning agent.
 
         - You can reason step-by-step
@@ -175,7 +172,15 @@ PROMPTS = {
 }
 
 
-def get_prompt(prompt_name):
+def get_prompt(prompt_name: str) -> str:
+
+    if prompt_name not in PROMPTS:
+
+        raise ValueError(
+            f"Prompt '{prompt_name}' not found. "
+            f"Available prompts: {list(PROMPTS.keys())}"
+        )
+
     return PROMPTS[prompt_name]
 
 
