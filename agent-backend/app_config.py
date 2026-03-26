@@ -63,7 +63,11 @@ TOP_K = int(
 # -----------------------------
 
 RECURSION_LIMIT = int(
-    os.getenv("RECURSION_LIMIT", 10)
+    os.getenv("RECURSION_LIMIT", 20)
+)
+
+RETRY_LIMIT = int(
+    os.getenv("RETRY_LIMIT", 2)
 )
 
 DEFAULT_PREFERENCE = os.getenv(

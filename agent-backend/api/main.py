@@ -10,7 +10,7 @@
 
 
 ###prompt selection integration
-#####graph.py langgraph mapping
+#####graph.py langgraph mapping### no maps in tolls used
 #### weird response smart toll has alreeady answered
 ### product improvements
 
@@ -132,8 +132,6 @@ async def chat_stream(query: str, session_id: str):
         # INTENT VALIDATION — restricting to travel-related queries only
         # ----------------------------------
 
-
-
         is_travel, intent = validate_product_intent(query)
 
         print("INTENT:", intent)
@@ -205,57 +203,3 @@ async def chat_stream(query: str, session_id: str):
         return EventSourceResponse(error())
 
 
-
-# @app.get("/chat-stream")
-# async def chat_stream(query: str, session_id: str):
-
-#     # session_id = "user3"  # For testing, override with a fixed session ID
-
-#     logging.info(f"Received query: {query}")
-
-#     try:
-
-#         result = await asyncio.wait_for(
-#             asyncio.to_thread(
-#                 run_langgraph_agent,
-#                 query,
-#                 session_id
-#             ),
-#             timeout=60
-#         )
-#         print("SESSION ID:", session_id)
-#         return EventSourceResponse(
-#             event_generator(result)
-#         )
-
-#     except Exception as e:
-
-#         import traceback
-
-#         error_text = str(e) or "Unknown error"
-
-#         logging.error(
-#             f"Error in chat_stream: {error_text}"
-#         )
-
-#         traceback.print_exc()
-
-#         async def error():
-
-#             yield {
-#                 "event": "message",
-#                 "data": f"Error: {error_text}"
-#             }
-
-#             yield {
-#                 "event": "end",
-#                 "data": "[DONE]"
-#             }
-
-#         return EventSourceResponse(error())
-
-
-# @app.get("/api/get-session-id")
-# def get_session():
-#     # This could come from login info or user database
-#     return {"session_id": "user3"} 

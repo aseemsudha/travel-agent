@@ -43,35 +43,21 @@ PRODUCT_KEYWORDS = [
 
 
 # -------------------------------------
-# STEP 1 — FAST CHECK
+# STEP 1 — FAST KEYWORD CHECK
 # -------------------------------------
-
 def keyword_check(query: str) -> bool:
-
-    query = query.lower()
-
-    return any(
-        word in query
-        for word in PRODUCT_KEYWORDS
-    )
+    normalized_query = query.strip().lower()
+    return any(word in normalized_query for word in PRODUCT_KEYWORDS)
 
 
 # -------------------------------------
 # STEP 2 — LLM CLASSIFIER
 # -------------------------------------
-
 def classify_intent_with_llm(query: str) -> str:
-
     prompt = f"""
         You are an intent classifier.
-
-        Classify the user query.
-
-        Return ONLY:
-
-        TRAVEL
-        or
-        NON_TRAVEL
+        Classify the user query as either TRAVEL or NON_TRAVEL.
+        Return ONLY TRAVEL or NON_TRAVEL.
 
         Query:
         {query}
@@ -79,42 +65,42 @@ def classify_intent_with_llm(query: str) -> str:
 
     response = call_llm(prompt, obs=None)
 
-    # Handle LangChain / OpenAI response objects safely
+    # Handle LangChain/OpenAI style response objects
     if hasattr(response, "content"):
         response_text = response.content
     else:
         response_text = str(response)
 
-    return response_text.strip().upper()
-
+    return response_text.strip().upper()  # normalize output
 
 # -------------------------------------
 # MAIN FUNCTION
 # -------------------------------------
-
 def validate_product_intent(query: str) -> Tuple[bool, str]:
+    """
+    Returns (is_travel: bool, intent: str)
+    """
 
     print("INTENT CHECK STARTED")
 
-    # STEP 1 — keyword
+    # Normalize query
+    normalized_query = query.strip().lower()
 
-    if keyword_check(query):
+    # STEP 1 — Keyword check
+    if keyword_check(normalized_query):
         print("KEYWORD MATCHED")
-
         return True, "TRAVEL"
 
     # STEP 2 — LLM fallback
-    
     try:
         print("CALLING LLM FOR INTENT")
-        intent = classify_intent_with_llm(query)
-        print("INTENT RESULT:", intent)
+        intent = classify_intent_with_llm(normalized_query)
+        print("LLM INTENT RESULT:", intent)
     except Exception as e:
         print("Intent classifier failed:", e)
         return False, "NON_TRAVEL"
 
     if intent == "TRAVEL":
-
         return True, "TRAVEL"
 
     return False, "NON_TRAVEL"

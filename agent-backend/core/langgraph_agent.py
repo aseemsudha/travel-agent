@@ -48,12 +48,13 @@ from llmops.observability import Observability as LLMObs
 
 from langsmith import traceable
 
-from app_config import RECURSION_LIMIT, LLM_MODEL
+from app_config import RECURSION_LIMIT, LLM_MODEL, RETRY_LIMIT
 from core.tool_retry import safe_tool_call
 
 from core.logger import logger
 import time
 from apps.travel_assistant.prompts.prompts import get_prompt
+from apps.travel_assistant.prompts.prompt_selector import choose_prompt
 
 
 
@@ -220,7 +221,14 @@ def agent_node(state: AgentState):
         "tips": ["tip 1", "tip 2"]
     }
 
-    prompt_template = get_prompt("agent_prompt_v1")
+    prompt_name = choose_prompt()
+    obs.log(
+        "prompt_selection",
+        {
+            "prompt": prompt_name
+        }
+    )
+    prompt_template = get_prompt(prompt_name)
 
     prompt = prompt_template.format(
         history=history,
@@ -282,27 +290,15 @@ def agent_node(state: AgentState):
 
     # Parse JSON safely
 
-    cleaned = re.sub(
-        r"```json|```",
-        "",
-        response
-    ).strip()
+    cleaned = re.sub(r"```json|```", "", response).strip()
 
     # CASE 1 — Tool call
-
     if "Action:" in cleaned:
-
-        structured = {}
+        structured = {}  # keep as is, tool will handle it
 
     # CASE 2 — Final answer text
-
     elif "Final Answer:" in cleaned:
-
-        final_text = cleaned.split(
-            "Final Answer:",
-            1
-        )[1].strip()
-
+        final_text = cleaned.split("Final Answer:", 1)[1].strip()
         structured = {
             "answer": final_text,
             "cards": [],
@@ -311,17 +307,15 @@ def agent_node(state: AgentState):
         }
 
     # CASE 3 — JSON response
-
     else:
-
         try:
-
-            structured = json.loads(cleaned)
-
-        except Exception as e:
-
-            print("JSON parse failed:", e)
-
+            parsed_json = json.loads(cleaned)
+            # Ensure we always have at least "answer" key
+            if "answer" not in parsed_json:
+                parsed_json["answer"] = cleaned
+            structured = parsed_json
+        except Exception:
+            # fallback if JSON fails
             structured = {
                 "answer": cleaned,
                 "cards": [],
@@ -331,6 +325,11 @@ def agent_node(state: AgentState):
 
     state["tool_output"] = structured
     obs.log("agent", {"response": response[:200]})
+
+    if not state["tool_output"].get("answer"):
+        last_msg = state["messages"][-1]["content"] if state["messages"] else ""
+        state["tool_output"]["answer"] = last_msg.strip() or "No answer generated"
+
     return state
 
 
@@ -349,7 +348,7 @@ def tool_node(state: AgentState):
     )
 
     action_match = re.search(r"Action:\s*(.*)", last_message)
-    input_match = re.search(r"Action Input:\s*(.*)", last_message)
+    input_match = re.search(r"Action Input:\s*(\{.*\})", last_message, re.DOTALL)
 
     if not action_match:
         state["error"] = "No action found in LLM response"
@@ -411,6 +410,11 @@ def tool_node(state: AgentState):
     #     return state
 
     state["messages"].append({"role": "system", "content": f"Observation: {result}"})
+    if isinstance(result, dict) and "error" in result:
+        state["error"] = result["error"]
+    else:
+        state["tool_output"] = result
+        state["error"] = ""
     obs.log("tool", {"tool": tool_name, "input": tool_input, "output": result, "error": state.get("error")})
     return state
 
@@ -522,6 +526,15 @@ def critic_node(state: AgentState):
 # ROUTER
 # =====================================================
 def router(state: AgentState):
+    """
+    Routing logic for LangGraph agent.
+    Decides next node based on state:
+      - tool → call tool
+      - retry → retry tool input
+      - critic → finalize answer
+      - fallback → critic to prevent infinite loops
+    """
+    import re
     start = time.time()
 
     last_message = (
@@ -529,44 +542,91 @@ def router(state: AgentState):
         if state["messages"]
         else ""
     )
-
     retry_count = state.get("retry_count", 0)
+    tool_output = state.get("tool_output", {})
 
-    # Default decision
+    # ---------------------------------
+    # Safety stop: max retries
+    # ---------------------------------
+    if retry_count >= RETRY_LIMIT:
+        decision = "critic"
+        logger.log(
+            event="routing_decision",
+            session_id=state["session_id"],
+            node="router",
+            decision=decision,
+            reason="retry_limit_reached",
+            retry_count=retry_count
+        )
+        return decision
 
-    decision = "critic"
-
-    # If tool error → retry
-
-    if state.get("error") and retry_count < 2:
+    # ---------------------------------
+    # Tool error → retry
+    # ---------------------------------
+    if state.get("error"):
         decision = "retry"
+        logger.log(
+            event="routing_decision",
+            session_id=state["session_id"],
+            node="router",
+            decision=decision,
+            reason="tool_error",
+            retry_count=retry_count
+        )
+        return decision
 
-    # If LLM produced action
-
-    elif "Action:" in last_message:
+    # ---------------------------------
+    # LLM produced action → call tool
+    # ---------------------------------
+    if "Action:" in last_message:
         decision = "tool"
+        logger.log(
+            event="routing_decision",
+            session_id=state["session_id"],
+            node="router",
+            decision=decision,
+            reason="action_detected",
+            retry_count=retry_count
+        )
+        return decision
 
-    # If final answer detected
-
-    elif "Final Answer:" in last_message:
+    # ---------------------------------
+    # Final answer detected: in text, JSON, or tool_output
+    # ---------------------------------
+    if (
+        "Final Answer:" in last_message
+        or re.search(r'"answer"\s*:', last_message)
+        or tool_output.get("answer")
+    ):
         decision = "critic"
+        logger.log(
+            event="routing_decision",
+            session_id=state["session_id"],
+            node="router",
+            decision=decision,
+            reason="final_answer_detected",
+            retry_count=retry_count
+        )
+        return decision
 
-    # Safety stop
-
-    elif retry_count >= RETRY_LIMIT:
-        decision = "critic"
-
-    latency = int((time.time() - start) * 1000)
-
-    # Log ONCE at the end
-
+    # ---------------------------------
+    # Fallback: go to critic to prevent infinite loops
+    # ---------------------------------
+    decision = "agent"
     logger.log(
         event="routing_decision",
         session_id=state["session_id"],
         node="router",
         decision=decision,
-        retry_count=retry_count,
-        has_error=bool(state.get("error")),
+        reason="fallback_to_critic",
+        retry_count=retry_count
+    )
+
+    latency = int((time.time() - start) * 1000)
+    logger.log(
+        event="routing_latency",
+        session_id=state["session_id"],
+        node="router",
         latency_ms=latency
     )
 
@@ -599,7 +659,7 @@ def build_graph():
     graph.add_conditional_edges(
         "tool",
         lambda state: "retry" if state.get("error") else "agent",
-        {"retry": "retry", "agent": "agent"}
+        {"retry": "retry", "agent": "agent", "critic": "critic"}
     )
 
     graph.add_edge("retry", "tool")
