@@ -150,60 +150,70 @@ function App() {
     // -------------------------------
     // MAP
     // -------------------------------
+    // if (msg.type === "map") {
+
+    //   const originalUrl = msg.data;
+
+    //   // Safe fallback search query
+    //   let embedUrl =
+    //     "https://www.google.com/maps?q=temples+in+nashik&output=embed";
+
+    //   try {
+    //     // Extract city or keyword from URL if possible
+    //     const decoded = decodeURIComponent(originalUrl);
+
+    //     if (decoded.toLowerCase().includes("nashik")) {
+    //       embedUrl =
+    //         "https://www.google.com/maps?q=temples+in+nashik&output=embed";
+    //     }
+
+    //   } catch (e) {
+    //     console.log("Map URL parse failed, using fallback");
+    //   }
+
+    //   return (
+    //     <div key={i} style={{ margin: "10px 0" }}>
+    //       <b>🗺 Location Map:</b>
+
+    //       <iframe
+    //         src={embedUrl}
+    //         width="100%"
+    //         height="350"
+    //         style={{
+    //           border: 0,
+    //           borderRadius: "10px",
+    //           marginTop: "8px"
+    //         }}
+    //         loading="lazy"
+    //         title="Google Map"
+    //       />
+
+    //       <div style={{ marginTop: "8px" }}>
+    //         <button
+    //           onClick={() => window.open(originalUrl, "_blank")}
+    //           style={{
+    //             padding: "6px 10px",
+    //             borderRadius: "6px",
+    //             border: "none",
+    //             background: "#28a745",
+    //             color: "white",
+    //             cursor: "pointer"
+    //           }}
+    //         >
+    //           📍 Open Full Directions
+    //         </button>
+    //       </div>
+
+    //     </div>
+    //   );
+    // }
+
     if (msg.type === "map") {
-
-      const originalUrl = msg.data;
-
-      // Safe fallback search query
-      let embedUrl =
-        "https://www.google.com/maps?q=temples+in+nashik&output=embed";
-
-      try {
-        // Extract city or keyword from URL if possible
-        const decoded = decodeURIComponent(originalUrl);
-
-        if (decoded.toLowerCase().includes("nashik")) {
-          embedUrl =
-            "https://www.google.com/maps?q=temples+in+nashik&output=embed";
-        }
-
-      } catch (e) {
-        console.log("Map URL parse failed, using fallback");
-      }
-
       return (
         <div key={i} style={{ margin: "10px 0" }}>
           <b>🗺 Location Map:</b>
 
-          <iframe
-            src={embedUrl}
-            width="100%"
-            height="350"
-            style={{
-              border: 0,
-              borderRadius: "10px",
-              marginTop: "8px"
-            }}
-            loading="lazy"
-            title="Google Map"
-          />
-
-          <div style={{ marginTop: "8px" }}>
-            <button
-              onClick={() => window.open(originalUrl, "_blank")}
-              style={{
-                padding: "6px 10px",
-                borderRadius: "6px",
-                border: "none",
-                background: "#28a745",
-                color: "white",
-                cursor: "pointer"
-              }}
-            >
-              📍 Open Full Directions
-            </button>
-          </div>
-
+          <MapView places={msg.data} />
         </div>
       );
     }
@@ -300,18 +310,34 @@ function App() {
     // -------------------------------
     // MAP (append)
     // -------------------------------
-    eventSource.addEventListener("map", (event) => {
-      const mapUrl = event.data;
+    // eventSource.addEventListener("map", (event) => {
+    //   const mapUrl = event.data;
 
+    //   setMessages((prev) => [
+    //     ...prev,
+    //     {
+    //       role: "bot",
+    //       type: "map",
+    //       data: mapUrl
+    //     }
+    //   ]);
+    // });
+
+    eventSource.addEventListener("map", (event) => {
+      console.log("RAW MAP EVENT:", event.data);
+      const places = JSON.parse(event.data);
+      console.log("PARSED PLACES:", places);
       setMessages((prev) => [
         ...prev,
         {
           role: "bot",
           type: "map",
-          data: mapUrl
+          data: places
         }
       ]);
     });
+
+    
 
     // -------------------------------
     // TIPS (append)

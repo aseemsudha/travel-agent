@@ -35,6 +35,8 @@ from core.knowledge_rag import load_knowledge
 from api.memory_deletion import router as memory_router
 from api.session import router as session_router
 from core.intent_validator import validate_product_intent
+from core.vector_db import store_memory, retrieve_memory
+from utils.parser import extract_preference
 
 
 
@@ -94,7 +96,8 @@ async def event_generator(result: dict):
     structured = result.get("structured_answer", {})
     answer = structured.get("answer", "")
     cards = structured.get("cards", [])
-    map_link = structured.get("map")
+    # map_link = structured.get("map")
+    map_places = structured.get("map")
     tips = structured.get("tips", [])
 
     if answer:
@@ -106,8 +109,12 @@ async def event_generator(result: dict):
         yield {"event": "card", "data": json.dumps(card)}
         await asyncio.sleep(0.05)
 
-    if map_link:
-        yield {"event": "map", "data": map_link}
+    # if map_link:
+    #     yield {"event": "map", "data": map_link}
+    #     await asyncio.sleep(0.05)
+
+    if map_places:
+        yield {"event": "map","data": json.dumps(map_places)}
         await asyncio.sleep(0.05)
 
     for tip in tips:
@@ -122,14 +129,124 @@ async def event_generator(result: dict):
 # -------------------------------
 @app.get("/chat-stream")
 async def chat_stream(query: str, session_id: str):
-    # session_id = "user3"  # For testing, override with a fixed session ID
 
     logging.info(f"Received query: {query}")
+
+    memory_keywords = [
+        "remember",
+        "save",
+        "set",
+        "store",
+        "update"
+    ]
+
+    is_memory_update = any(
+        word in query.lower()
+        for word in memory_keywords
+    )
+
+    # ----------------------------------
+    # STORE PREFERENCE
+    # ----------------------------------
+
+    if is_memory_update:
+
+        key, value = extract_preference(query)
+
+        # -----------------------------
+        # Fallback if parser fails
+        # -----------------------------
+        if not key:
+
+            key = "general"
+            value = query
+
+        text = f"{key}: {value}"
+
+        metadata = {
+            "session_id": session_id,
+            "type": "preference",
+            "key": key
+        }
+
+        store_memory(text, metadata)
+
+        print("Preference stored:", text)
+
+        async def memory_saved():
+
+            yield {
+                "event": "message",
+                "data": f"Saved preference: {text}"
+            }
+
+            yield {
+                "event": "end",
+                "data": "[DONE]"
+            }
+
+        return EventSourceResponse(memory_saved())
+
+    # ----------------------------------
+    # READ PREFERENCE
+    # ----------------------------------
+
+    preference_query_keywords = [
+        "what is my preference",
+        "show my preference",
+        "my saved preference",
+        "my budget",
+        "my location"
+    ]
+
+    is_preference_query = any(
+        phrase in query.lower()
+        for phrase in preference_query_keywords
+    )
+
+    if is_preference_query:
+
+        memories = retrieve_memory(session_id)
+
+        if not memories:
+
+            async def no_pref():
+
+                yield {
+                    "event": "message",
+                    "data": "No preferences saved yet."
+                }
+
+                yield {
+                    "event": "end",
+                    "data": "[DONE]"
+                }
+
+            return EventSourceResponse(no_pref())
+
+        pref_text = "Your saved preferences:\n"
+
+        for m in memories:
+            pref_text += f"- {m['key']}: {m['value']}\n"
+
+        async def show_pref():
+
+            yield {
+                "event": "message",
+                "data": pref_text
+            }
+
+            yield {
+                "event": "end",
+                "data": "[DONE]"
+            }
+
+        return EventSourceResponse(show_pref())
 
     try:
 
         # ----------------------------------
-        # INTENT VALIDATION — restricting to travel-related queries only
+        # INTENT VALIDATION
         # ----------------------------------
 
         is_travel, intent = validate_product_intent(query)
@@ -160,6 +277,12 @@ async def chat_stream(query: str, session_id: str):
             return EventSourceResponse(non_travel())
 
         # ----------------------------------
+        # LOAD MEMORY
+        # ----------------------------------
+
+        memories = retrieve_memory(session_id)
+
+        # ----------------------------------
         # RUN LANGGRAPH
         # ----------------------------------
 
@@ -167,7 +290,8 @@ async def chat_stream(query: str, session_id: str):
             asyncio.to_thread(
                 run_langgraph_agent,
                 query,
-                session_id
+                session_id,
+                memory=memories
             ),
             timeout=60
         )
@@ -201,5 +325,3 @@ async def chat_stream(query: str, session_id: str):
             }
 
         return EventSourceResponse(error())
-
-

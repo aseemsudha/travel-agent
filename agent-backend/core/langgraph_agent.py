@@ -214,10 +214,23 @@ def agent_node(state: AgentState):
         for msg in state["messages"]
     )
 
+    # json_instruction = {
+    #     "answer": "<plain text answer>",
+    #     "cards": [{"title": "...", "description": "..."}],
+    #     "map": "<map link if applicable>",
+    #     "tips": ["tip 1", "tip 2"]
+    # }
+
     json_instruction = {
         "answer": "<plain text answer>",
         "cards": [{"title": "...", "description": "..."}],
-        "map": "<map link if applicable>",
+        "map": [
+            {
+                "name": "...",
+                "lat": 0.0,
+                "lng": 0.0
+            }
+        ],
         "tips": ["tip 1", "tip 2"]
     }
 
@@ -237,33 +250,6 @@ def agent_node(state: AgentState):
         query=query,
         scratchpad=scratchpad
     )
-
-    # prompt = f"""
-    #     You are an AI travel assistant.
-
-    #     You MUST consider the user's previous preferences and conversation history when generating the response.
-
-    #     User Memory:
-    #     {memory}
-
-    #     Relevant Knowledge:
-    #     {knowledge}
-
-    #     User Query:
-    #     {query}
-
-    #     You MUST return ONLY valid JSON.
-
-    #     Do NOT write explanations.
-    #     Do NOT write markdown.
-    #     Do NOT write text before or after JSON.
-
-    #     Return exactly this format:
-
-    #     {json.dumps(json_instruction, indent=4)}
-
-    #     If information is missing, still generate a useful plan.
-    # """
 
     # LLMOps observability
     llm_obs = LLMObs()
@@ -397,17 +383,6 @@ def tool_node(state: AgentState):
 
         state["tool_output"] = result
         state["error"] = ""
-
-    # try:
-    #     result = execute_tool(tool_name, tool_input)
-    #     if isinstance(result, dict) and "error" in result:
-    #         state["error"] = result["error"]
-    #     else:
-    #         state["tool_output"] = result
-    #         state["error"] = ""
-    # except Exception as e:
-    #     state["error"] = f"Tool execution failed: {str(e)}"
-    #     return state
 
     state["messages"].append({"role": "system", "content": f"Observation: {result}"})
     if isinstance(result, dict) and "error" in result:
@@ -672,16 +647,34 @@ def build_graph():
 # RUN FUNCTION
 # =====================================================
 @traceable(name="run_langgraph_agent")
-def run_langgraph_agent(query: str, session_id: str):
+def run_langgraph_agent(query: str, session_id: str, memory=None):
     start_time = time.time()
     graph = build_graph()
     obs = LGObs()  # LangGraph observability
+
+    # -----------------------------
+    # LOAD USER MEMORY
+    # -----------------------------
+
+    memories = memory
+
+    memory_context = ""
+
+    if memories:
+
+        memory_context = "User preferences:\n"
+
+        for m in memories:
+
+            memory_context += f"{m['key']}: {m['value']}\n"
+
+    print("MEMORY CONTEXT:", memory_context)
 
     state = {
         "query": query,
         "session_id": session_id,
         "messages": [],
-        "memory_context": "",
+        "memory_context": memory_context,
         "knowledge_context": "",
         "tool_output": {},
         "retry_count": 0,
@@ -689,39 +682,6 @@ def run_langgraph_agent(query: str, session_id: str):
         "final_answer": "",
         "trace": obs
     }
-
-    # ----------------------------------
-    # INTENT VALIDATION
-    # ----------------------------------
-
-    # is_travel, intent = validate_product_intent(query)
-
-    # if not is_travel:
-
-    #     return {
-    #         "answer": (
-    #             "I specialize in travel-related assistance only. "
-    #             "Please ask about flights, hotels, destinations, "
-    #             "or trip planning."
-    #         ),
-    #         "structured_answer": {
-    #             "answer": (
-    #                 "I specialize in travel-related assistance only. "
-    #                 "Please ask about flights, hotels, destinations, "
-    #                 "or trip planning."
-    #             ),
-    #             "cards": [],
-    #             "map": None,
-    #             "tips": [
-    #                 "Search flights",
-    #                 "Find hotels",
-    #                 "Plan itinerary",
-    #                 "Explore destinations"
-    #             ]
-    #         },
-    #         "trace": [],
-    #         "summary": {}
-    #     }
 
     state = graph.invoke(
         state,
@@ -757,10 +717,3 @@ def run_langgraph_agent(query: str, session_id: str):
         "trace": obs.get_trace(),
         "summary": obs.summary()
     }
-
-    # return {
-    #     "answer": state.get("tool_output", {}).get("answer", "No answer generated"),
-    #     "structured_answer": state.get("tool_output", {}),
-    #     "trace": obs.get_trace(),
-    #     "summary": obs.summary()
-    # }

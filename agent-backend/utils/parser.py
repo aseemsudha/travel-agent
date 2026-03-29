@@ -73,3 +73,30 @@ def extract_two_values(text):
         return words[0], " ".join(words[1:])
 
     return text, ""
+
+def extract_preference(query):
+
+    query = query.lower()
+
+    preferences = {
+        "budget": ["budget"],
+        "location": ["location", "city", "destination"],
+        "travel_date": ["date", "travel date"],
+        "transport": ["flight", "train", "bus"]
+    }
+
+    for key, keywords in preferences.items():
+
+        for word in keywords:
+
+            if word in query:
+
+                parts = query.split(word)
+
+                if len(parts) > 1:
+
+                    value = parts[1].replace("is", "").replace(":", "").strip()
+
+                    return key, value
+
+    return None, None

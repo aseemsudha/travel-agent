@@ -34,6 +34,8 @@ client = chromadb.PersistentClient(
     )
 )
 
+print("db collecttions:", client.list_collections())
+
 # -----------------------------
 # Get or create collection
 # -----------------------------
@@ -333,3 +335,37 @@ def store_memory(text, metadata):
 
     # Maintain memory after adding
     maintain_memory(session_id=full_metadata.get("session_id"), auto_delete_expired=True)
+
+def retrieve_memory(session_id):
+    """
+    Retrieve all memories for a session.
+    Used to load user preferences before answering.
+    """
+
+    collection = get_memory_collection()
+
+    results = collection.get(
+        where={
+            "session_id": session_id
+        },
+        include=["documents", "metadatas"]
+    )
+
+    documents = results.get("documents", [])
+    metadatas = results.get("metadatas", [])
+
+    memories = []
+
+    for doc, meta in zip(documents, metadatas):
+
+        if meta.get("type") == "preference":
+
+            memories.append({
+                "text": doc,
+                "key": meta.get("key"),
+                "value": doc.split(":")[-1].strip()
+            })
+
+    print("Loaded memories:", memories)
+
+    return memories

@@ -23,10 +23,22 @@ PROMPTS: Dict[str, str] = {
         - Avoid unnecessary tool calls
         - Provide clear, helpful responses
 
+        IMPORTANT:
+
+        Map data is used by the frontend to render markers on a map.
+
+        You MUST return geographic coordinates.
+
+        Never return map URLs.
+
+        Always return latitude and longitude when places are shown.
+
         --------------------------------
         ALWAYS USE SAVED USER PREFERENCES
         --------------------------------
+
         Always use saved user preferences to personalize recommendations.
+
         If a preference is set, suggest options that match it.
 
         --------------------------------
@@ -54,6 +66,7 @@ PROMPTS: Dict[str, str] = {
         Use when category is unknown
 
         Input:
+
         {{
             "city": "city name",
             "category": "temple / restaurant / hotel",
@@ -63,6 +76,7 @@ PROMPTS: Dict[str, str] = {
         smart_food_recommender
 
         Input:
+
         {{
             "city": "city name",
             "preference": "quiet / crowded"
@@ -71,6 +85,7 @@ PROMPTS: Dict[str, str] = {
         smart_hotel_recommender
 
         Input:
+
         {{
             "city": "city name",
             "preference": "quiet / crowded"
@@ -79,6 +94,7 @@ PROMPTS: Dict[str, str] = {
         smart_temple_recommender
 
         Input:
+
         {{
             "city": "city name",
             "preference": "quiet / crowded"
@@ -86,7 +102,14 @@ PROMPTS: Dict[str, str] = {
 
         google_maps_search
 
+        Use this tool ONLY to fetch geographic coordinates.
+
+        Do NOT return URLs from this tool.
+
+        Always return latitude and longitude.
+
         Input:
+
         {{
             "query": "search query"
         }}
@@ -94,6 +117,7 @@ PROMPTS: Dict[str, str] = {
         estimate_crowd
 
         Input:
+
         {{
             "place": "place name"
         }}
@@ -101,6 +125,7 @@ PROMPTS: Dict[str, str] = {
         festival_detector
 
         Input:
+
         {{
             "city": "city name"
         }}
@@ -108,6 +133,7 @@ PROMPTS: Dict[str, str] = {
         suggest_travel_plan
 
         Input:
+
         {{
             "city": "city name",
             "interest": "user interest"
@@ -144,6 +170,7 @@ PROMPTS: Dict[str, str] = {
         Action: tool_name
 
         Action Input:
+
         {{
             valid JSON only
         }}
@@ -162,12 +189,42 @@ PROMPTS: Dict[str, str] = {
                 }}
             ],
 
-            "map": "Provide a Google Maps link showing all the main places in your cards. If not applicable, return null.",
+            "map": [
+                {{
+                    "name": "Place name",
+                    "lat": 12.9716,
+                    "lng": 77.5946
+                }}
+            ],
 
             "tips": [
                 "Practical travel tip"
             ]
         }}
+
+        --------------------------------
+        MAP RULES
+        --------------------------------
+
+        If cards are returned,
+        map entries MUST also be returned.
+
+        Each map entry must contain:
+
+        name
+        lat
+        lng
+
+        Coordinates must be numeric.
+
+        Do NOT return strings for latitude or longitude.
+
+        If coordinates are unavailable,
+        return:
+
+        "map": []
+
+        Never return a Google Maps URL.
 
         --------------------------------
         RULES
@@ -182,6 +239,8 @@ PROMPTS: Dict[str, str] = {
         Never hallucinate tool names.
 
         Always return valid JSON.
+
+        Always follow the output schema exactly.
 
         --------------------------------
         USER QUESTION

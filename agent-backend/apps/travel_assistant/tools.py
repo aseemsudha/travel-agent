@@ -63,13 +63,29 @@ def smart_place_recommender(tool_input: dict):
         elif preference.lower() == "crowded":
             score += 2 if crowd_data["crowd_level"] in ["High", "Very High"] else 0
 
+        # results.append({
+        #     "name": name,
+        #     "rating": rating,
+        #     "reviews": reviews,
+        #     "crowd": crowd_data["crowd_level"],
+        #     "wait_time": wait_data["estimated_wait_minutes"],
+        #     "score": round(score, 2)
+        # })
+
+        location = place.get("geometry", {}).get("location", {})
+
+        lat = location.get("lat")
+        lng = location.get("lng")
+
         results.append({
             "name": name,
             "rating": rating,
             "reviews": reviews,
             "crowd": crowd_data["crowd_level"],
             "wait_time": wait_data["estimated_wait_minutes"],
-            "score": round(score, 2)
+            "score": round(score, 2),
+            "lat": lat,
+            "lng": lng
         })
 
     results = sorted(results, key=lambda x: x["score"], reverse=True)
@@ -152,25 +168,64 @@ def temple_wait_time(tool_input: dict):
 # =====================================================
 # GOOGLE SEARCH
 # =====================================================
+# def google_maps_search(tool_input: dict):
+#     query = tool_input.get("query", "")
+
+#     url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
+#     data = safe_get(url, {"query": query, "key": GOOGLE_MAPS_API_KEY})
+
+#     if "error" in data:
+#         return {"error": data["error"]}
+
+#     results = []
+
+#     for place in data.get("results", [])[:5]:
+#         results.append({
+#             "name": place.get("name"),
+#             "address": place.get("formatted_address"),
+#             "rating": place.get("rating")
+#         })
+
+#     return {"query": query, "results": results}
+
 def google_maps_search(tool_input: dict):
     query = tool_input.get("query", "")
 
     url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
-    data = safe_get(url, {"query": query, "key": GOOGLE_MAPS_API_KEY})
 
-    if "error" in data:
-        return {"error": data["error"]}
+    data = safe_get(
+        url,
+        {
+            "query": query,
+            "key": GOOGLE_MAPS_API_KEY
+        }
+    )
+
+    if not data or "error" in data:
+        return []
 
     results = []
 
     for place in data.get("results", [])[:5]:
+
+        location = (
+            place.get("geometry", {})
+            .get("location", {})
+        )
+
+        lat = location.get("lat")
+        lng = location.get("lng")
+
+        if lat is None or lng is None:
+            continue
+
         results.append({
             "name": place.get("name"),
-            "address": place.get("formatted_address"),
-            "rating": place.get("rating")
+            "lat": float(lat),
+            "lng": float(lng)
         })
 
-    return {"query": query, "results": results}
+    return results
 
 
 # =====================================================
