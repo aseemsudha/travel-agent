@@ -189,6 +189,7 @@ def temple_wait_time(tool_input: dict):
 #     return {"query": query, "results": results}
 
 def google_maps_search(tool_input: dict):
+
     query = tool_input.get("query", "")
 
     url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
@@ -202,7 +203,9 @@ def google_maps_search(tool_input: dict):
     )
 
     if not data or "error" in data:
-        return []
+        return {
+            "error": data.get("error", "Google Maps API failed")
+        }
 
     results = []
 
@@ -225,7 +228,10 @@ def google_maps_search(tool_input: dict):
             "lng": float(lng)
         })
 
-    return results
+    return {
+        "status": "success",
+        "results": results
+    }
 
 
 # =====================================================

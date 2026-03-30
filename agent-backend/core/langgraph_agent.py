@@ -214,13 +214,6 @@ def agent_node(state: AgentState):
         for msg in state["messages"]
     )
 
-    # json_instruction = {
-    #     "answer": "<plain text answer>",
-    #     "cards": [{"title": "...", "description": "..."}],
-    #     "map": "<map link if applicable>",
-    #     "tips": ["tip 1", "tip 2"]
-    # }
-
     json_instruction = {
         "answer": "<plain text answer>",
         "cards": [{"title": "...", "description": "..."}],
@@ -572,6 +565,7 @@ def router(state: AgentState):
         "Final Answer:" in last_message
         or re.search(r'"answer"\s*:', last_message)
         or tool_output.get("answer")
+        or tool_output.get("results")
     ):
         decision = "critic"
         logger.log(
