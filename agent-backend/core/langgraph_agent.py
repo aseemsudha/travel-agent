@@ -35,7 +35,8 @@ from core.vector_db import (
     get_memory_collection
 )
 from core.vector_memory import search_memory_faiss
-from core.knowledge_rag import search_knowledge
+# from core.knowledge_rag import search_knowledge
+from core.vector_db import search_knowledge
 from core.query_rewriter import rewrite_query
 from core.retry import fix_tool_input
 
@@ -176,7 +177,7 @@ def rag_node(state: AgentState):
 
     knowledge_text = "\n".join(
         [k["text"] if isinstance(k, dict) else str(k) for k in knowledge_results]
-    ) if knowledge_results else "No knowledge found"
+    ) if knowledge_results else ""
 
     state["knowledge_context"] = knowledge_text
 

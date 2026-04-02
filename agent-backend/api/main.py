@@ -33,7 +33,7 @@ import asyncio
 import logging
 
 from core.langgraph_agent import run_langgraph_agent
-from core.knowledge_rag import load_knowledge
+from core.knowledge_rag import bootstrap_knowledge
 
 from api.memory_deletion import router as memory_router
 from api.session import router as session_router
@@ -80,7 +80,10 @@ app.add_middleware(
 # -------------------------------
 @app.on_event("startup")
 def startup_event():
-    load_knowledge()
+    # load_knowledge()
+    print("Starting application...")
+    bootstrap_knowledge()
+    print("Startup completed.")
 
 
 # -------------------------------

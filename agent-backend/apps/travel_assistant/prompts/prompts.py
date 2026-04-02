@@ -33,6 +33,13 @@ PROMPTS: Dict[str, str] = {
 
         Always return latitude and longitude when places are shown.
 
+        Knowledge has already been retrieved.
+
+        Do NOT call retrieve_travel_knowledge unless:
+
+        - knowledge section is empty
+        - information is insufficient
+
         --------------------------------
         ALWAYS USE SAVED USER PREFERENCES
         --------------------------------
@@ -71,6 +78,23 @@ PROMPTS: Dict[str, str] = {
             "city": "city name",
             "category": "temple / restaurant / hotel",
             "preference": "quiet / crowded"
+        }}
+
+        retrieve_travel_knowledge
+
+        Use this tool ONLY when:
+
+        - Relevant knowledge is missing
+        - Additional factual information is required
+        - The answer cannot be completed using provided knowledge
+
+        Do NOT call this tool if knowledge is already available in context.
+
+        Input:
+
+        {{
+            "query": "search query",
+            "k": optional number of results
         }}
 
         smart_food_recommender
@@ -241,6 +265,9 @@ PROMPTS: Dict[str, str] = {
         Always return valid JSON.
 
         Always follow the output schema exactly.
+
+        If relevant knowledge is already provided,
+        use it directly instead of calling retrieve_travel_knowledge.
 
         --------------------------------
         USER QUESTION

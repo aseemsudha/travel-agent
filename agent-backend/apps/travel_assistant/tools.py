@@ -3,7 +3,9 @@
 import requests
 import os
 from datetime import datetime
-from core.knowledge_rag import search_knowledge
+import time
+# from core.knowledge_rag import search_knowledge
+from core.vector_db import search_knowledge
 from app_config import DEFAULT_PREFERENCE
 
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
@@ -264,17 +266,88 @@ def suggest_travel_plan(tool_input: dict):
 # =====================================================
 # RAG TOOL
 # =====================================================
+import time
+from core.vector_db import search_knowledge
+
+
+# =====================================================
+# RAG TOOL
+# =====================================================
 def retrieve_travel_knowledge(tool_input: dict):
+
     query = tool_input.get("query", "")
+    k = tool_input.get("k", 3)
 
-    results = search_knowledge(query)
+    # -----------------------------
+    # Validate input
+    # -----------------------------
+    if not query:
 
+        return {
+            "status": "error",
+            "message": "Query is required",
+            "results": []
+        }
+
+    start_time = time.time()
+
+    # -----------------------------
+    # Safe retrieval
+    # -----------------------------
+    try:
+
+        results = search_knowledge(query, k=k)
+
+    except Exception as e:
+
+        return {
+            "status": "error",
+            "message": str(e),
+            "results": []
+        }
+
+    latency = int((time.time() - start_time) * 1000)
+
+    # -----------------------------
+    # No results case
+    # -----------------------------
     if not results:
-        return {"result": "No knowledge found"}
 
+        return {
+            "status": "success",
+            "query": query,
+            "documents_found": 0,
+            "latency_ms": latency,
+            "results": []
+        }
+
+    # -----------------------------
+    # Format results
+    # -----------------------------
+    formatted_results = []
+
+    for r in results:
+
+        formatted_results.append(
+            {
+                "text": r.get("text", ""),
+                "source": (
+                    r.get("metadata", {}).get("source", "unknown")
+                    if isinstance(r.get("metadata"), dict)
+                    else "unknown"
+                )
+            }
+        )
+
+    # -----------------------------
+    # Final response
+    # -----------------------------
     return {
+        "status": "success",
         "query": query,
-        "results": [r["text"] for r in results]
+        "documents_found": len(formatted_results),
+        "latency_ms": latency,
+        "results": formatted_results
     }
 
 

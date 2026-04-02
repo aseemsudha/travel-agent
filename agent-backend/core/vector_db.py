@@ -99,8 +99,22 @@ def search_knowledge(query, k=3, source_filter=None):
             "metadata": meta
         })
 
+    print("Searching knowledge for:", query)
+    print("Results found:", len(knowledge_results))
+
     return knowledge_results
 
+def clear_knowledge():
+
+    collection = get_knowledge_collection()
+
+    ids = collection.get()["ids"]
+
+    if ids:
+
+        collection.delete(ids=ids)
+
+        print("Knowledge collection cleared.")
 
 def get_memory_collection():
 
