@@ -90,7 +90,7 @@ def chunk_text(text, chunk_size=CHUNK_SIZE):
     return chunks
 
 
-#### for hybrid search - vecttor+ keyword search ####
+#### for hybrid search - vector+ keyword search ####
 def keyword_search(query):
 
     query_words = query.lower().split()

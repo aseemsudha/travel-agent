@@ -9,10 +9,13 @@
 # streamlit run dashboard.py
 
 
-###prompt selection integration
+
 #####graph.py langgraph mapping### no maps in tolls used
-#### weird response smart toll has alreeady answered
 ### product improvements
+
+####issues to fix
+# 1. load_knowledge() funtion hard coded data in main.py
+# 3 — Rename "temples" → "places"
 
 ####changes for Vertex AI####
 # .env changes
@@ -96,7 +99,6 @@ async def event_generator(result: dict):
     structured = result.get("structured_answer", {})
     answer = structured.get("answer", "")
     cards = structured.get("cards", [])
-    # map_link = structured.get("map")
     map_places = structured.get("map")
     tips = structured.get("tips", [])
 
@@ -108,10 +110,6 @@ async def event_generator(result: dict):
     for card in cards:
         yield {"event": "card", "data": json.dumps(card)}
         await asyncio.sleep(0.05)
-
-    # if map_link:
-    #     yield {"event": "map", "data": map_link}
-    #     await asyncio.sleep(0.05)
 
     if map_places:
         yield {"event": "map","data": json.dumps(map_places)}

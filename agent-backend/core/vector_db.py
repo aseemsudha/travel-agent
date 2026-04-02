@@ -133,22 +133,6 @@ def save_memory(text, metadata=None):
     print("Memory stored:", text)
     print("Memory count:", collection.count())
 
-# def save_memory(text, metadata=None):
-    
-#     collection = get_memory_collection()
-
-#     embedding = model.encode(text).tolist()
-
-#     collection.add(
-#         documents=[text],
-#         embeddings=[embedding],
-#         metadatas=[metadata or {}],
-#         ids=[str(uuid.uuid4())]
-#     )
-
-#     print("Memory stored:", text)
-#     print("Memory count:", collection.count())
-
 def search_memory(query, k=3):
 
     collection = get_memory_collection()

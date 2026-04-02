@@ -42,25 +42,6 @@ function App() {
   initializeSession();
 }, []);
 
-//   useEffect(() => {
-//   const fetchSession = async () => {
-//     try {
-//       // Example: fetch sessionId from backend
-//       const res = await fetch("http://127.0.0.1:8000/api/get-session-id");
-//       const data = await res.json();
-//       setSessionId(data.session_id);
-//       console.log("Session ID set to:", data.session_id);
-
-//       // setSessionId("user3"); // MOCK: replace with real session logic
-//       // console.log("Session ID set to:", sessionId);
-//     } catch (e) {
-//       console.error("Failed to get session id", e);
-//     }
-//   };
-
-//   fetchSession();
-// }, []);
-
   useEffect(() => {
     return () => {
       if (eventSourceRef.current) {
@@ -150,63 +131,6 @@ function App() {
     // -------------------------------
     // MAP
     // -------------------------------
-    // if (msg.type === "map") {
-
-    //   const originalUrl = msg.data;
-
-    //   // Safe fallback search query
-    //   let embedUrl =
-    //     "https://www.google.com/maps?q=temples+in+nashik&output=embed";
-
-    //   try {
-    //     // Extract city or keyword from URL if possible
-    //     const decoded = decodeURIComponent(originalUrl);
-
-    //     if (decoded.toLowerCase().includes("nashik")) {
-    //       embedUrl =
-    //         "https://www.google.com/maps?q=temples+in+nashik&output=embed";
-    //     }
-
-    //   } catch (e) {
-    //     console.log("Map URL parse failed, using fallback");
-    //   }
-
-    //   return (
-    //     <div key={i} style={{ margin: "10px 0" }}>
-    //       <b>🗺 Location Map:</b>
-
-    //       <iframe
-    //         src={embedUrl}
-    //         width="100%"
-    //         height="350"
-    //         style={{
-    //           border: 0,
-    //           borderRadius: "10px",
-    //           marginTop: "8px"
-    //         }}
-    //         loading="lazy"
-    //         title="Google Map"
-    //       />
-
-    //       <div style={{ marginTop: "8px" }}>
-    //         <button
-    //           onClick={() => window.open(originalUrl, "_blank")}
-    //           style={{
-    //             padding: "6px 10px",
-    //             borderRadius: "6px",
-    //             border: "none",
-    //             background: "#28a745",
-    //             color: "white",
-    //             cursor: "pointer"
-    //           }}
-    //         >
-    //           📍 Open Full Directions
-    //         </button>
-    //       </div>
-
-    //     </div>
-    //   );
-    // }
 
     if (msg.type === "map") {
       return (
@@ -266,7 +190,7 @@ function App() {
     const eventSource = new EventSource(
       `http://127.0.0.1:8000/chat-stream?query=${encodeURIComponent(
         currentInput
-      )}&session_id=${sessionId}` // <-- dynamic
+      )}&session_id=${sessionId}`
     );
 
     eventSourceRef.current = eventSource;
@@ -310,18 +234,6 @@ function App() {
     // -------------------------------
     // MAP (append)
     // -------------------------------
-    // eventSource.addEventListener("map", (event) => {
-    //   const mapUrl = event.data;
-
-    //   setMessages((prev) => [
-    //     ...prev,
-    //     {
-    //       role: "bot",
-    //       type: "map",
-    //       data: mapUrl
-    //     }
-    //   ]);
-    // });
 
     eventSource.addEventListener("map", (event) => {
       console.log("RAW MAP EVENT:", event.data);
