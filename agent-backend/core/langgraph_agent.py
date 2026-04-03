@@ -35,7 +35,6 @@ from core.vector_db import (
     get_memory_collection
 )
 from core.vector_memory import search_memory_faiss
-# from core.knowledge_rag import search_knowledge
 from core.vector_db import search_knowledge
 from core.query_rewriter import rewrite_query
 from core.retry import fix_tool_input

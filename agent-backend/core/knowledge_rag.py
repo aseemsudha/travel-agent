@@ -2,7 +2,6 @@ import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 import os
-# from core.vector_db import add_knowledge, search_knowledge, get_knowledge_collection
 from core.vector_db import add_knowledge, get_knowledge_collection
 from app_config import KNOWLEDGE_DIR, TOP_K, CHUNK_SIZE
 
@@ -63,34 +62,6 @@ def load_knowledge():
     add_knowledge(texts, metadatas)
 
     print("Knowledge ingestion completed.")
-
-###### chroma db implemented ####
-# def search_knowledge(query, source_filter=None):
-
-#     results = collection.query(
-#         query_texts=[query],
-#         n_results=TOP_K
-#     )
-
-#     documents = results["documents"][0]
-#     metadatas = results["metadatas"][0]
-#     distances = results["distances"][0]
-
-#     final_results = []
-
-#     for doc, meta, dist in zip(documents, metadatas, distances):
-
-#         if source_filter:
-#             if meta["source"] != source_filter:
-#                 continue
-
-#         final_results.append({
-#             "text": doc,
-#             "source": meta["source"],
-#             "distance": dist
-#         })
-
-#     return final_results
 
 def chunk_text(text, chunk_size=500, overlap=100):
 

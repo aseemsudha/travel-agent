@@ -1,7 +1,7 @@
-from core.knowledge_rag import load_knowledge
+# from core.knowledge_rag import load_knowledge
 
-print("Loading knowledge into Chroma...")
+# print("Loading knowledge into Chroma...")
 
-load_knowledge()
+# load_knowledge()
 
-print("Knowledge loaded successfully")
+# print("Knowledge loaded successfully")

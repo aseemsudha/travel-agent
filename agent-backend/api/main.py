@@ -14,7 +14,7 @@
 ### product improvements
 
 ####issues to fix
-# 1. load_knowledge() funtion hard coded data in main.py
+#
 # 3 — Rename "temples" → "places"
 
 ####changes for Vertex AI####
