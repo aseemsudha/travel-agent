@@ -115,3 +115,22 @@ MEMORY_TTL_DAYS = int(
 MEMORY_DELETE_EXPIRED = True
 
 MEMORY_USER_CAN_DELETE = True
+
+# =============================
+# MEMORY FEATURE FLAGS
+# =============================
+
+# Toggle keyword-based preference detection
+USE_KEYWORD_MEMORY = False
+
+# Toggle automatic memory classification
+ENABLE_MEMORY_CLASSIFIER = False
+
+# Enable short-term conversation memory
+ENABLE_SHORT_TERM_MEMORY = True
+
+# Enable long-term persistent memory
+ENABLE_LONG_TERM_MEMORY = True
+
+# Max short-term messages to keep
+SHORT_TERM_MEMORY_LIMIT = 5

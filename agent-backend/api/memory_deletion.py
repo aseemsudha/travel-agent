@@ -32,6 +32,25 @@ async def delete_user_memory(session_id: str = None):
             return {"message": "No memories to delete"}
 
         collection.delete(ids=ids_to_delete)
+
+        # -------------------------
+        # DELETE SHORT-TERM MEMORY
+        # -------------------------
+
+        # if session_id:
+
+        #     clear_short_term_memory(session_id)
+
+        # else:
+
+        #     clear_all_short_term_memory()
+
+        # return {
+        #     "message": "All memories deleted"
+        # }
+
+        print("DELETE session:", session_id)
+        print("IDS:", ids_to_delete)
         return {"message": f"Deleted {len(ids_to_delete)} memories."}
 
     except Exception as e:

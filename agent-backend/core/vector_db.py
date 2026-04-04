@@ -342,9 +342,23 @@ def retrieve_memory(session_id):
 
     collection = get_memory_collection()
 
+    # results = collection.get(
+    #     where={
+    #         "session_id": session_id
+    #     },
+    #     include=["documents", "metadatas"]
+    # )
+
     results = collection.get(
         where={
-            "session_id": session_id
+            "$and": [
+                {"session_id": session_id},
+                {
+                    "type": {
+                        "$in": ["preference", "conversation"]
+                    }
+                }
+            ]
         },
         include=["documents", "metadatas"]
     )
@@ -356,7 +370,8 @@ def retrieve_memory(session_id):
 
     for doc, meta in zip(documents, metadatas):
 
-        if meta.get("type") == "preference":
+        # if meta.get("type") == "preference":
+        if meta.get("type") in ["preference", "conversation"]:
 
             memories.append({
                 "text": doc,

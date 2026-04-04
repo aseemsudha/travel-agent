@@ -40,6 +40,10 @@ from api.session import router as session_router
 from core.intent_validator import validate_product_intent
 from core.vector_db import store_memory, retrieve_memory
 from utils.parser import extract_preference
+from app_config import (
+        USE_KEYWORD_MEMORY,
+        ENABLE_LONG_TERM_MEMORY
+    )
 
 
 
@@ -133,30 +137,39 @@ async def chat_stream(query: str, session_id: str):
 
     logging.info(f"Received query: {query}")
 
-    memory_keywords = [
-        "remember",
-        "save",
-        "set",
-        "store",
-        "update"
-    ]
+    # =========================================================
+    # DETECT MEMORY UPDATE (SAVE PREFERENCE)
+    # =========================================================
 
-    is_memory_update = any(
-        word in query.lower()
-        for word in memory_keywords
-    )
+    is_memory_update = False
 
-    # ----------------------------------
-    # STORE PREFERENCE
-    # ----------------------------------
+    if USE_KEYWORD_MEMORY:
 
-    if is_memory_update:
+        memory_keywords = [
+            "remember",
+            "save",
+            "set",
+            "store",
+            "update"
+        ]
+
+        is_memory_update = any(
+            word in query.lower()
+            for word in memory_keywords
+        )
+
+    # ---------------------------------------------------------
+    # STORE LONG TERM MEMORY (Chroma)
+    # ---------------------------------------------------------
+
+    if (
+        USE_KEYWORD_MEMORY
+        and is_memory_update
+        and ENABLE_LONG_TERM_MEMORY
+    ):
 
         key, value = extract_preference(query)
 
-        # -----------------------------
-        # Fallback if parser fails
-        # -----------------------------
         if not key:
 
             key = "general"
@@ -186,28 +199,40 @@ async def chat_stream(query: str, session_id: str):
                 "data": "[DONE]"
             }
 
-        return EventSourceResponse(memory_saved())
+        return EventSourceResponse(
+            memory_saved()
+        )
 
-    # ----------------------------------
-    # READ PREFERENCE
-    # ----------------------------------
+    # =========================================================
+    # DETECT PREFERENCE QUERY (READ MEMORY)
+    # =========================================================
 
-    preference_query_keywords = [
-        "what is my preference",
-        "show my preference",
-        "my saved preference",
-        "my budget",
-        "my location"
-    ]
+    is_preference_query = False
 
-    is_preference_query = any(
-        phrase in query.lower()
-        for phrase in preference_query_keywords
-    )
+    if ENABLE_LONG_TERM_MEMORY:
+
+        preference_query_keywords = [
+            "what is my preference",
+            "show my preference",
+            "my saved preference",
+            "my budget",
+            "my location"
+        ]
+
+        is_preference_query = any(
+            phrase in query.lower()
+            for phrase in preference_query_keywords
+        )
+
+    # ---------------------------------------------------------
+    # READ LONG TERM MEMORY
+    # ---------------------------------------------------------
 
     if is_preference_query:
 
-        memories = retrieve_memory(session_id)
+        memories = retrieve_memory(
+            session_id
+        )
 
         if not memories:
 
@@ -215,7 +240,8 @@ async def chat_stream(query: str, session_id: str):
 
                 yield {
                     "event": "message",
-                    "data": "No preferences saved yet."
+                    "data":
+                    "No preferences saved yet."
                 }
 
                 yield {
@@ -223,12 +249,17 @@ async def chat_stream(query: str, session_id: str):
                     "data": "[DONE]"
                 }
 
-            return EventSourceResponse(no_pref())
+            return EventSourceResponse(
+                no_pref()
+            )
 
         pref_text = "Your saved preferences:\n"
 
         for m in memories:
-            pref_text += f"- {m['key']}: {m['value']}\n"
+
+            pref_text += (
+                f"- {m['key']}: {m['value']}\n"
+            )
 
         async def show_pref():
 
@@ -242,15 +273,18 @@ async def chat_stream(query: str, session_id: str):
                 "data": "[DONE]"
             }
 
-        return EventSourceResponse(show_pref())
+        return EventSourceResponse(
+            show_pref()
+        )
+
+    # =========================================================
+    # NORMAL CHAT FLOW
+    # =========================================================
 
     try:
 
-        # ----------------------------------
-        # INTENT VALIDATION
-        # ----------------------------------
-
-        is_travel, intent = validate_product_intent(query)
+        is_travel, intent = \
+            validate_product_intent(query)
 
         print("INTENT:", intent)
         print("SESSION ID:", session_id)
@@ -260,9 +294,12 @@ async def chat_stream(query: str, session_id: str):
             async def non_travel():
 
                 message = (
-                    "I specialize in travel-related assistance only. "
-                    "Please ask about flights, hotels, destinations, "
-                    "or trip planning."
+                    "I specialize in "
+                    "travel-related assistance "
+                    "only. Please ask about "
+                    "flights, hotels, "
+                    "destinations, or trip "
+                    "planning."
                 )
 
                 yield {
@@ -275,17 +312,15 @@ async def chat_stream(query: str, session_id: str):
                     "data": "[DONE]"
                 }
 
-            return EventSourceResponse(non_travel())
+            return EventSourceResponse(
+                non_travel()
+            )
 
-        # ----------------------------------
-        # LOAD MEMORY
-        # ----------------------------------
+        # -----------------------------------------------------
 
-        memories = retrieve_memory(session_id)
-
-        # ----------------------------------
-        # RUN LANGGRAPH
-        # ----------------------------------
+        memories = retrieve_memory(
+            session_id
+        )
 
         result = await asyncio.wait_for(
             asyncio.to_thread(
@@ -305,10 +340,12 @@ async def chat_stream(query: str, session_id: str):
 
         import traceback
 
-        error_text = str(e) or "Unknown error"
+        error_text = str(e) or \
+            "Unknown error"
 
         logging.error(
-            f"Error in chat_stream: {error_text}"
+            f"Error in chat_stream: "
+            f"{error_text}"
         )
 
         traceback.print_exc()
@@ -317,7 +354,8 @@ async def chat_stream(query: str, session_id: str):
 
             yield {
                 "event": "message",
-                "data": f"Error: {error_text}"
+                "data":
+                f"Error: {error_text}"
             }
 
             yield {
@@ -325,4 +363,213 @@ async def chat_stream(query: str, session_id: str):
                 "data": "[DONE]"
             }
 
-        return EventSourceResponse(error())
+        return EventSourceResponse(
+            error()
+        )
+
+
+
+
+
+
+
+
+
+# @app.get("/chat-stream")
+# async def chat_stream(query: str, session_id: str):
+
+#     logging.info(f"Received query: {query}")
+
+#     memory_keywords = [
+#         "remember",
+#         "save",
+#         "set",
+#         "store",
+#         "update"
+#     ]
+
+#     is_memory_update = any(
+#         word in query.lower()
+#         for word in memory_keywords
+#     )
+
+#     # ----------------------------------
+#     # STORE PREFERENCE
+#     # ----------------------------------
+
+#     if is_memory_update:
+
+#         key, value = extract_preference(query)
+
+#         # -----------------------------
+#         # Fallback if parser fails
+#         # -----------------------------
+#         if not key:
+
+#             key = "general"
+#             value = query
+
+#         text = f"{key}: {value}"
+
+#         metadata = {
+#             "session_id": session_id,
+#             "type": "preference",
+#             "key": key
+#         }
+
+#         store_memory(text, metadata)
+
+#         print("Preference stored:", text)
+
+#         async def memory_saved():
+
+#             yield {
+#                 "event": "message",
+#                 "data": f"Saved preference: {text}"
+#             }
+
+#             yield {
+#                 "event": "end",
+#                 "data": "[DONE]"
+#             }
+
+#         return EventSourceResponse(memory_saved())
+
+#     # ----------------------------------
+#     # READ PREFERENCE
+#     # ----------------------------------
+
+#     preference_query_keywords = [
+#         "what is my preference",
+#         "show my preference",
+#         "my saved preference",
+#         "my budget",
+#         "my location"
+#     ]
+
+#     is_preference_query = any(
+#         phrase in query.lower()
+#         for phrase in preference_query_keywords
+#     )
+
+#     if is_preference_query:
+
+#         memories = retrieve_memory(session_id)
+
+#         if not memories:
+
+#             async def no_pref():
+
+#                 yield {
+#                     "event": "message",
+#                     "data": "No preferences saved yet."
+#                 }
+
+#                 yield {
+#                     "event": "end",
+#                     "data": "[DONE]"
+#                 }
+
+#             return EventSourceResponse(no_pref())
+
+#         pref_text = "Your saved preferences:\n"
+
+#         for m in memories:
+#             pref_text += f"- {m['key']}: {m['value']}\n"
+
+#         async def show_pref():
+
+#             yield {
+#                 "event": "message",
+#                 "data": pref_text
+#             }
+
+#             yield {
+#                 "event": "end",
+#                 "data": "[DONE]"
+#             }
+
+#         return EventSourceResponse(show_pref())
+
+#     try:
+
+#         # ----------------------------------
+#         # INTENT VALIDATION
+#         # ----------------------------------
+
+#         is_travel, intent = validate_product_intent(query)
+
+#         print("INTENT:", intent)
+#         print("SESSION ID:", session_id)
+
+#         if not is_travel:
+
+#             async def non_travel():
+
+#                 message = (
+#                     "I specialize in travel-related assistance only. "
+#                     "Please ask about flights, hotels, destinations, "
+#                     "or trip planning."
+#                 )
+
+#                 yield {
+#                     "event": "message",
+#                     "data": message
+#                 }
+
+#                 yield {
+#                     "event": "end",
+#                     "data": "[DONE]"
+#                 }
+
+#             return EventSourceResponse(non_travel())
+
+#         # ----------------------------------
+#         # LOAD MEMORY
+#         # ----------------------------------
+
+#         memories = retrieve_memory(session_id)
+
+#         # ----------------------------------
+#         # RUN LANGGRAPH
+#         # ----------------------------------
+
+#         result = await asyncio.wait_for(
+#             asyncio.to_thread(
+#                 run_langgraph_agent,
+#                 query,
+#                 session_id,
+#                 memory=memories
+#             ),
+#             timeout=60
+#         )
+
+#         return EventSourceResponse(
+#             event_generator(result)
+#         )
+
+#     except Exception as e:
+
+#         import traceback
+
+#         error_text = str(e) or "Unknown error"
+
+#         logging.error(
+#             f"Error in chat_stream: {error_text}"
+#         )
+
+#         traceback.print_exc()
+
+#         async def error():
+
+#             yield {
+#                 "event": "message",
+#                 "data": f"Error: {error_text}"
+#             }
+
+#             yield {
+#                 "event": "end",
+#                 "data": "[DONE]"
+#             }
+
+#         return EventSourceResponse(error())
