@@ -460,71 +460,204 @@ def retry_node(state: AgentState):
 
 #     print("Running CRITIC node")
 
-#     obs = state["trace"]
-
-#     start_time = time.time()
-
 #     structured = state.get("tool_output", {})
+
 #     answer = structured.get("answer")
 
 #     if not answer:
+#         print("No answer found — skipping memory save")
 #         return state
 
 #     improved = run_critic(
 #         state["query"],
 #         answer,
-#         obs
+#         state["trace"]
 #     )
 
 #     state["final_answer"] = improved
 
-#     # Save memory
-#     store_memory(
-#         f"user: {state['query']}",
-#         {
-#             "session_id": state["session_id"],
-#             "type": "conversation"
-#         }
+#     session_id = state["session_id"]
+#     query = state["query"]
+
+#     print("Session:", session_id)
+#     print("Query:", query)
+
+#     # ----------------------------------
+#     # SHORT TERM MEMORY
+#     # ----------------------------------
+
+#     if ENABLE_SHORT_TERM_MEMORY:
+
+#         try:
+
+#             save_short_term_memory(
+#                 session_id,
+#                 f"user: {query}"
+#             )
+
+#             save_short_term_memory(
+#                 session_id,
+#                 f"agent: {improved}"
+#             )
+
+#             print("Short-term memory saved")
+
+#         except Exception as e:
+
+#             print("Short-term memory error:", str(e))
+
+#     # ----------------------------------
+#     # LONG TERM MEMORY (automatic)
+#     # ----------------------------------
+
+#     if ENABLE_LONG_TERM_MEMORY:
+
+#         should_save = False
+
+#         print("ENABLE_MEMORY_CLASSIFIER:", ENABLE_MEMORY_CLASSIFIER)
+#         print("USE_KEYWORD_MEMORY:", USE_KEYWORD_MEMORY)
+
+#         # -----------------------------
+#         # KEYWORD MODE
+#         # -----------------------------
+
+#         if USE_KEYWORD_MEMORY:
+
+#             keywords = [
+#                 "remember",
+#                 "save",
+#                 "store",
+#                 "set",
+#                 "update"
+#             ]
+
+#             should_save = any(
+#                 word in query.lower()
+#                 for word in keywords
+#             )
+
+#             print("Keyword decision:", should_save)
+
+#         # -----------------------------
+#         # DYNAMIC MODE
+#         # -----------------------------
+
+#         else:
+
+#             if ENABLE_MEMORY_CLASSIFIER:
+
+#                 try:
+
+#                     classifier_input = (
+#                         query
+#                         + " "
+#                         + improved
+#                     )
+
+#                     print(
+#                         "Classifier input:",
+#                         classifier_input
+#                     )
+
+#                     should_save = memory_classifier(
+#                         classifier_input
+#                     )
+
+#                     print(
+#                         "Classifier decision:",
+#                         should_save
+#                     )
+
+#                 except Exception as e:
+
+#                     print(
+#                         "Classifier error:",
+#                         str(e)
+#                     )
+
+#                     should_save = False
+
+#             else:
+
+#                 should_save = True
+
+#                 print(
+#                     "Classifier disabled — saving"
+#                 )
+
+#         # -----------------------------
+#         # SAVE MEMORY
+#         # -----------------------------
+
+#         if should_save:
+
+#             try:
+
+#                 metadata = {
+#                     "session_id": session_id,
+#                     "type": "conversation",
+#                     "key": "conversation"
+#                 }
+
+#                 # Save USER message
+
+#                 store_memory(
+#                     f"user: {query}",
+#                     metadata
+#                 )
+
+#                 # Save AGENT response
+
+#                 store_memory(
+#                     f"agent: {improved}",
+#                     metadata
+#                 )
+
+#                 print(
+#                     "Long-term memory saved to Chroma"
+#                 )
+
+#             except Exception as e:
+
+#                 print(
+#                     "Long-term memory error:",
+#                     str(e)
+#                 )
+
+#         else:
+
+#             print(
+#                 "Memory NOT saved — classifier returned False"
+#             )
+
+#     print(
+#         "Saving memory:",
+#         query,
+#         "session:",
+#         session_id
 #     )
 
-#     store_memory(
-#         f"agent: {improved}",
-#         {
-#             "session_id": state["session_id"],
-#             "type": "conversation"
-#         }
-#     )
-
-#     obs.log(
-#         "critic",
-#         {
-#             "final": improved[:200]
-#         }
-#     )
-
-#     latency = int((time.time() - start_time) * 1000)
-#     logger.log(
-#         event="final_response",
-#         session_id=state["session_id"],
-#         node="critic",
-#         status="success",
-#         latency_ms=latency,
-#         response_length=len(state.get("final_answer", ""))
-#     )
 #     return state
 
+# =====================================================
+# CRITIC NODE
+# =====================================================
 @traceable(name="critic_node")
 def critic_node(state: AgentState):
 
-    print("Running CRITIC node")
+    print("Runningggggggg CRITIC node")
 
     structured = state.get("tool_output", {})
 
     answer = structured.get("answer")
 
     if not answer:
-        print("No answer found — skipping memory save")
+        print("No answer found — skipping critic")
         return state
+
+    # ----------------------------------
+    # RUN CRITIC
+    # ----------------------------------
 
     improved = run_critic(
         state["query"],
@@ -539,6 +672,32 @@ def critic_node(state: AgentState):
 
     print("Session:", session_id)
     print("Query:", query)
+    print("Critic completed — passing to memory_write node")
+
+    return state
+
+
+# =====================================================
+# MEMORY WRITE NODE
+# =====================================================
+@traceable(name="memory_write_node")
+def memory_write_node(state: AgentState):
+    print("Runninggggggg MEMORY_WRITE node")
+
+    improved = state.get("final_answer")
+
+    if not improved:
+        print("No final answer found — skipping memory save")
+        return state
+
+    session_id = state["session_id"]
+    query = state["query"]
+
+    print("Session:", session_id)
+    print("Query:", query)
+
+
+    print("Entered MEMORY WRITE node")
 
     # ----------------------------------
     # SHORT TERM MEMORY
@@ -694,16 +853,7 @@ def critic_node(state: AgentState):
         "session:",
         session_id
     )
-
     return state
-
-# =====================================================
-# MEMORY WRITE NODE
-# =====================================================
-@traceable(name="memory_write_node")
-def memory_write_node(state: AgentState):
-
-    print("Entered MEMORY WRITE node")
 
 # =====================================================
 # ROUTER
