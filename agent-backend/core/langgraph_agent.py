@@ -83,10 +83,10 @@ class AgentState(TypedDict):
 
 
 # =====================================================
-# MEMORY NODE
+# MEMORY READ NODE
 # =====================================================
-@traceable(name="memory_node")
-def memory_node(state: AgentState):
+@traceable(name="memory_read_node")
+def memory_read_node(state: AgentState):
 
     obs = state["trace"]
     start = time.time()
@@ -95,7 +95,7 @@ def memory_node(state: AgentState):
     query = state["query"]
 
     obs.log(
-        "memory",
+        "memory_read",
         {
             "query": query,
             "session_id": session_id
@@ -167,7 +167,7 @@ def memory_node(state: AgentState):
     logger.log(
         event="memory_retrieval",
         session_id=session_id,
-        node="memory",
+        node="memory_read",
         history_count=len(history),
         semantic_count=len(documents),
         latency_ms=latency
@@ -698,6 +698,14 @@ def critic_node(state: AgentState):
     return state
 
 # =====================================================
+# MEMORY WRITE NODE
+# =====================================================
+@traceable(name="memory_write_node")
+def memory_write_node(state: AgentState):
+
+    print("Entered MEMORY WRITE node")
+
+# =====================================================
 # ROUTER
 # =====================================================
 def router(state: AgentState):
@@ -815,15 +823,16 @@ def router(state: AgentState):
 def build_graph():
     graph = StateGraph(AgentState)
 
-    graph.add_node("memory", memory_node)
+    graph.add_node("memory_read", memory_read_node)
     graph.add_node("rag", rag_node)
     graph.add_node("agent", agent_node)
     graph.add_node("tool", tool_node)
     graph.add_node("retry", retry_node)
     graph.add_node("critic", critic_node)
+    graph.add_node("memory_write", memory_write_node)
 
-    graph.set_entry_point("memory")
-    graph.add_edge("memory", "rag")
+    graph.set_entry_point("memory_read")
+    graph.add_edge("memory_read", "rag")
     graph.add_edge("rag", "agent")
 
     graph.add_conditional_edges(
@@ -839,7 +848,9 @@ def build_graph():
     )
 
     graph.add_edge("retry", "tool")
-    graph.add_edge("critic", END)
+    # graph.add_edge("critic", END)
+    graph.add_edge("critic", "memory_write")
+    graph.add_edge("memory_write", END)
 
     return graph.compile()
 
