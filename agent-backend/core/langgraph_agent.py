@@ -49,13 +49,12 @@ from core.retry import fix_tool_input
 import json
 import re
 
-
 from core.observability import Observability as LGObs
 from llmops.observability import Observability as LLMObs
 
 from langsmith import traceable
 
-from app_config import RECURSION_LIMIT, LLM_MODEL, RETRY_LIMIT
+from app_config import RECURSION_LIMIT, LLM_MODEL, MAX_RETRIES, MAX_AGENT_ITERATIONS
 from core.tool_retry import safe_tool_call
 
 from core.logger import logger
@@ -220,6 +219,55 @@ def rag_node(state: AgentState):
 def agent_node(state: AgentState):
     print("Running AGENT node")
     # state["retry_count"] = state.get("retry_count", 0) + 1
+     # ----------------------------------
+    # ITERATION CONTROL
+    # ----------------------------------
+
+    iteration_count = state.get(
+        "iteration_count",
+        0
+    )
+
+    print(
+        "AGENT ITERATION:",
+        iteration_count
+    )
+
+    obs = state["trace"]
+
+    obs.log(
+        "agent_iteration",
+        {
+            "iteration": iteration_count
+        }
+    )
+
+    if iteration_count >= MAX_AGENT_ITERATIONS:
+
+        print(
+            "Max agent iterations reached"
+        )
+
+        logger.log(
+            event="agent_iteration_limit_reached",
+            session_id=state["session_id"],
+            node="agent",
+            iteration_count=iteration_count
+        )
+
+        state["final_answer"] = (
+            "I could not complete the task "
+            "within allowed iterations."
+        )
+        state["error"] = "max_iterations_exceeded"
+
+        return state
+
+    state["iteration_count"] = (
+        iteration_count + 1
+    )
+
+
     state.setdefault("retry_count", 0)
 
     print(
@@ -333,6 +381,7 @@ def agent_node(state: AgentState):
         state["tool_output"]["answer"] = last_msg.strip() or "No answer generated"
 
     return state
+    
 
 
 # =====================================================
@@ -392,20 +441,22 @@ def tool_node(state: AgentState):
     )
 
     if isinstance(result, dict) and "error" in result:
-
         state["error"] = result["error"]
-
     else:
-
         state["tool_output"] = result
         state["error"] = ""
 
     state["messages"].append({"role": "system", "content": f"Observation: {result}"})
-    if isinstance(result, dict) and "error" in result:
-        state["error"] = result["error"]
-    else:
-        state["tool_output"] = result
-        state["error"] = ""
+    # if isinstance(result, dict) and "error" in result:
+    #     state["error"] = result["error"]
+    # else:
+    #     state["tool_output"] = result
+    #     state["error"] = ""
+
+    if not state.get("error"):
+        state["retry_count"] = 0
+        print("Retry counter reset")
+
     obs.log("tool", {"tool": tool_name, "input": tool_input, "output": result, "error": state.get("error")})
     return state
 
@@ -415,13 +466,19 @@ def tool_node(state: AgentState):
 # =====================================================
 @traceable(name="retry_node")
 def retry_node(state: AgentState):
-    import re
     obs = state["trace"]
     obs.log("retry", {"retry_count": state.get("retry_count", 0)})
     start = time.time()
     
+    if state.get("retry_count", 0) >= MAX_RETRIES:
+        obs.log(
+            "retry_limit_reached",
+            {
+                "retry_count": state.get("retry_count")
+            }
+        )
 
-    if state.get("retry_count", 0) >= 2:
+        state["error"] = "max_retries_exceeded"
         return state
 
     last_message = state["messages"][-1]["content"]
@@ -450,194 +507,6 @@ def retry_node(state: AgentState):
     )
 
     return state
-
-
-# =====================================================
-# CRITIC NODE
-# =====================================================
-# @traceable(name="critic_node")
-# def critic_node(state: AgentState):
-
-#     print("Running CRITIC node")
-
-#     structured = state.get("tool_output", {})
-
-#     answer = structured.get("answer")
-
-#     if not answer:
-#         print("No answer found — skipping memory save")
-#         return state
-
-#     improved = run_critic(
-#         state["query"],
-#         answer,
-#         state["trace"]
-#     )
-
-#     state["final_answer"] = improved
-
-#     session_id = state["session_id"]
-#     query = state["query"]
-
-#     print("Session:", session_id)
-#     print("Query:", query)
-
-#     # ----------------------------------
-#     # SHORT TERM MEMORY
-#     # ----------------------------------
-
-#     if ENABLE_SHORT_TERM_MEMORY:
-
-#         try:
-
-#             save_short_term_memory(
-#                 session_id,
-#                 f"user: {query}"
-#             )
-
-#             save_short_term_memory(
-#                 session_id,
-#                 f"agent: {improved}"
-#             )
-
-#             print("Short-term memory saved")
-
-#         except Exception as e:
-
-#             print("Short-term memory error:", str(e))
-
-#     # ----------------------------------
-#     # LONG TERM MEMORY (automatic)
-#     # ----------------------------------
-
-#     if ENABLE_LONG_TERM_MEMORY:
-
-#         should_save = False
-
-#         print("ENABLE_MEMORY_CLASSIFIER:", ENABLE_MEMORY_CLASSIFIER)
-#         print("USE_KEYWORD_MEMORY:", USE_KEYWORD_MEMORY)
-
-#         # -----------------------------
-#         # KEYWORD MODE
-#         # -----------------------------
-
-#         if USE_KEYWORD_MEMORY:
-
-#             keywords = [
-#                 "remember",
-#                 "save",
-#                 "store",
-#                 "set",
-#                 "update"
-#             ]
-
-#             should_save = any(
-#                 word in query.lower()
-#                 for word in keywords
-#             )
-
-#             print("Keyword decision:", should_save)
-
-#         # -----------------------------
-#         # DYNAMIC MODE
-#         # -----------------------------
-
-#         else:
-
-#             if ENABLE_MEMORY_CLASSIFIER:
-
-#                 try:
-
-#                     classifier_input = (
-#                         query
-#                         + " "
-#                         + improved
-#                     )
-
-#                     print(
-#                         "Classifier input:",
-#                         classifier_input
-#                     )
-
-#                     should_save = memory_classifier(
-#                         classifier_input
-#                     )
-
-#                     print(
-#                         "Classifier decision:",
-#                         should_save
-#                     )
-
-#                 except Exception as e:
-
-#                     print(
-#                         "Classifier error:",
-#                         str(e)
-#                     )
-
-#                     should_save = False
-
-#             else:
-
-#                 should_save = True
-
-#                 print(
-#                     "Classifier disabled — saving"
-#                 )
-
-#         # -----------------------------
-#         # SAVE MEMORY
-#         # -----------------------------
-
-#         if should_save:
-
-#             try:
-
-#                 metadata = {
-#                     "session_id": session_id,
-#                     "type": "conversation",
-#                     "key": "conversation"
-#                 }
-
-#                 # Save USER message
-
-#                 store_memory(
-#                     f"user: {query}",
-#                     metadata
-#                 )
-
-#                 # Save AGENT response
-
-#                 store_memory(
-#                     f"agent: {improved}",
-#                     metadata
-#                 )
-
-#                 print(
-#                     "Long-term memory saved to Chroma"
-#                 )
-
-#             except Exception as e:
-
-#                 print(
-#                     "Long-term memory error:",
-#                     str(e)
-#                 )
-
-#         else:
-
-#             print(
-#                 "Memory NOT saved — classifier returned False"
-#             )
-
-#     print(
-#         "Saving memory:",
-#         query,
-#         "session:",
-#         session_id
-#     )
-
-#     return state
 
 # =====================================================
 # CRITIC NODE
@@ -881,7 +750,7 @@ def router(state: AgentState):
     # ---------------------------------
     # Safety stop: max retries
     # ---------------------------------
-    if retry_count >= RETRY_LIMIT:
+    if retry_count >= MAX_RETRIES:
         decision = "critic"
         logger.log(
             event="routing_decision",
@@ -946,13 +815,14 @@ def router(state: AgentState):
     # ---------------------------------
     # Fallback: go to critic to prevent infinite loops
     # ---------------------------------
-    decision = "agent"
+    # decision = "agent"
+    decision = "critic"
     logger.log(
         event="routing_decision",
         session_id=state["session_id"],
         node="router",
         decision=decision,
-        reason="fallback_to_critic",
+        reason="fallback_safety_stop", #fallback_to_critic
         retry_count=retry_count
     )
 
@@ -998,7 +868,6 @@ def build_graph():
     )
 
     graph.add_edge("retry", "tool")
-    # graph.add_edge("critic", END)
     graph.add_edge("critic", "memory_write")
     graph.add_edge("memory_write", END)
 
@@ -1040,6 +909,7 @@ def run_langgraph_agent(query: str, session_id: str, memory=None):
         "knowledge_context": "",
         "tool_output": {},
         "retry_count": 0,
+        "iteration_count": 0,
         "error": "",
         "final_answer": "",
         "trace": obs

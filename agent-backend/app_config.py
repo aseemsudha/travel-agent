@@ -66,10 +66,6 @@ RECURSION_LIMIT = int(
     os.getenv("RECURSION_LIMIT", 20)
 )
 
-RETRY_LIMIT = int(
-    os.getenv("RETRY_LIMIT", 2)
-)
-
 DEFAULT_PREFERENCE = os.getenv(
     "DEFAULT_PREFERENCE",
     "balanced"
@@ -134,3 +130,9 @@ ENABLE_LONG_TERM_MEMORY = True
 
 # Max short-term messages to keep
 SHORT_TERM_MEMORY_LIMIT = 5
+
+# Max retry for retry nodes in the agent graph
+MAX_RETRIES = 3
+
+# Max agent iterations to prevent infinite loops
+MAX_AGENT_ITERATIONS = 6
