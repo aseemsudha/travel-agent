@@ -14,7 +14,10 @@
 ### product improvements
 
 ####issues to fix
-#
+# Sort conditional edges
+# what tool_retry doing
+# use of memory engine file
+# retry logic - understanding
 # 3 — Rename "temples" → "places"
 
 ####changes for Vertex AI####

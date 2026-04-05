@@ -860,11 +860,12 @@ def build_graph():
         router,
         {"tool": "tool", "critic": "critic", "agent": "agent"}
     )
-
+    #techncally it should go to critic and not agent but thgis is done in case there are multiple tools to execute.
+    # currently my system has only 1 tool. in futture there can be multiple
     graph.add_conditional_edges(
         "tool",
         lambda state: "retry" if state.get("error") else "agent",
-        {"retry": "retry", "agent": "agent", "critic": "critic"}
+        {"retry": "retry", "agent": "agent"}
     )
 
     graph.add_edge("retry", "tool")
